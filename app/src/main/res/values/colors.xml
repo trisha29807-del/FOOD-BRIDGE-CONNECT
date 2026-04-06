@@ -3,5 +3,10 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="green_primary">#2E7D32</color>
+    <color name="green_dark">#1B5E20</color>
+    <color name="green_light">#E8F5E9</color>
+    <color name="background">#F5F5EE</color>
+    <color name="text_primary">#222222</color>
     <color name="text_secondary">#6D7B6E</color>
+    <color name="logout_red">#C62828</color>
 </resources>
