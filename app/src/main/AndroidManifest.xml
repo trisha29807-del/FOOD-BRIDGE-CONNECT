@@ -46,6 +46,7 @@
             android:name=".EditProfileActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".BrowseActivity" />
 
     </application>
 

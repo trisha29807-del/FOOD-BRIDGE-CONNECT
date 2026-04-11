@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<MaterialButton>(R.id.btnFindFood).setOnClickListener {
             // TODO: open BrowseActivity when built
-            startActivity(Intent(this, DonateFoodActivity::class.java))
+            startActivity(Intent(this, BrowseActivity::class.java))
         }
 
         // Quick action cards
@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<android.view.View>(R.id.cardNearbyFood).setOnClickListener {
-            // TODO: open BrowseActivity when built
+            startActivity(Intent(this, BrowseActivity::class.java))
         }
     }
 
@@ -57,6 +57,9 @@ class MainActivity : AppCompatActivity() {
                     }
                     R.id.nav_profile -> {
                         startActivity(Intent(this, ProfileActivity::class.java)); true
+                    }
+                    R.id.nav_browse -> {
+                        startActivity(Intent(this, BrowseActivity::class.java)); true
                     }
                     else -> false
                 }
