@@ -58,28 +58,47 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <!-- Add Photo -->
-                    <LinearLayout
-                        android:id="@+id/btnAddPhoto"
+                    <!-- Photo area: upload prompt + preview swap -->
+                    <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="120dp"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="@drawable/dashed_border_bg"
                         android:layout_marginBottom="20dp">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="📷"
-                            android:textSize="28sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Add food photos"
-                            android:textSize="13sp"
-                            android:textColor="#888888"
-                            android:layout_marginTop="6dp" />
-                    </LinearLayout>
+
+                        <!-- Tap-to-add placeholder (hidden after photo is picked) -->
+                        <LinearLayout
+                            android:id="@+id/btnAddPhoto"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:background="@drawable/dashed_border_bg">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="📷"
+                                android:textSize="28sp" />
+
+                            <TextView
+                                android:id="@+id/tvPhotoHint"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Add food photos"
+                                android:textSize="13sp"
+                                android:textColor="#888888"
+                                android:layout_marginTop="6dp" />
+                        </LinearLayout>
+
+                        <!-- Preview image (hidden until a photo is selected) -->
+                        <ImageView
+                            android:id="@+id/ivFoodPhoto"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone"
+                            android:contentDescription="Selected food photo" />
+
+                    </FrameLayout>
 
                     <!-- Food Name -->
                     <TextView

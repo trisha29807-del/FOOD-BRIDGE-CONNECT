@@ -6,24 +6,25 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import java.text.SimpleDateFormat
 import java.util.*
 
 class FoodListingAdapter(
-    private var listings: MutableList<DocumentSnapshot>,
-    private val onClaimClick: (DocumentSnapshot) -> Unit
+    private val listings: MutableList<DocumentSnapshot>,
+    private val onClaim: (DocumentSnapshot) -> Unit
 ) : RecyclerView.Adapter<FoodListingAdapter.ViewHolder>() {
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val tvFoodName: TextView = view.findViewById(R.id.tvFoodName)
-        val tvDonorName: TextView = view.findViewById(R.id.tvDonorName)
-        val tvFoodTypeBadge: TextView = view.findViewById(R.id.tvFoodTypeBadge)
-        val tvQuantity: TextView = view.findViewById(R.id.tvQuantity)
-        val tvLocation: TextView = view.findViewById(R.id.tvLocation)
-        val tvExpiry: TextView = view.findViewById(R.id.tvExpiry)
-        val tvDescription: TextView = view.findViewById(R.id.tvDescription)
-        val btnClaim: MaterialButton = view.findViewById(R.id.btnClaim)
+        val tvFoodName:   TextView      = view.findViewById(R.id.tvFoodName)
+        val tvFoodType:   TextView      = view.findViewById(R.id.tvFoodType)
+        val tvDonorName:  TextView      = view.findViewById(R.id.tvDonorName)
+        val tvLocation:   TextView      = view.findViewById(R.id.tvLocation)
+        val tvQuantity:   TextView      = view.findViewById(R.id.tvQuantity)
+        val tvExpiry:     TextView      = view.findViewById(R.id.tvExpiry)
+        val tvDescription:TextView      = view.findViewById(R.id.tvDescription)
+        val btnClaim:     MaterialButton= view.findViewById(R.id.btnClaim)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -35,41 +36,43 @@ class FoodListingAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val doc = listings[position]
 
-        holder.tvFoodName.text = doc.getString("foodName") ?: "Unnamed"
-        holder.tvDonorName.text = "By: ${doc.getString("donorName") ?: "Unknown"}"
-        holder.tvFoodTypeBadge.text = doc.getString("foodType") ?: "Food"
-        holder.tvQuantity.text = "Qty: ${doc.getString("quantity") ?: "-"}"
-        holder.tvLocation.text = "📍 ${doc.getString("location") ?: "Unknown"}"
-        holder.tvDescription.text = doc.getString("description") ?: ""
+        holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
+        holder.tvFoodType.text  = doc.getString("foodType")  ?: ""
+        holder.tvDonorName.text = doc.getString("donorName") ?: "Anonymous"
+        holder.tvLocation.text  = doc.getString("location")  ?: "Location not set"
+        holder.tvQuantity.text  = doc.getString("quantity")  ?: ""
 
         // Format expiry date
-        val expiryTs = doc.getTimestamp("expiryDate")
-        if (expiryTs != null) {
-            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
-            holder.tvExpiry.text = "⏰ Expires: ${sdf.format(expiryTs.toDate())}"
+        val expiry = doc.getTimestamp("expiryDate")
+        if (expiry != null) {
+            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+            holder.tvExpiry.text = sdf.format(expiry.toDate())
         } else {
-            holder.tvExpiry.text = "Expiry: Not specified"
+            holder.tvExpiry.text = "N/A"
+        }
+
+        // Show description if available
+        val desc = doc.getString("description")
+        if (!desc.isNullOrEmpty()) {
+            holder.tvDescription.text = desc
+            holder.tvDescription.visibility = View.VISIBLE
+        } else {
+            holder.tvDescription.visibility = View.GONE
         }
 
         holder.btnClaim.setOnClickListener {
-            onClaimClick(doc)
+            holder.btnClaim.isEnabled = false
+            holder.btnClaim.text = "Claiming..."
+            onClaim(doc)
         }
     }
 
-    override fun getItemCount() = listings.size
+    override fun getItemCount(): Int = listings.size
 
-    /** Replace full list (used when filter chip changes or search runs) */
+    // Called from BrowseActivity after filter/search
     fun submitList(newList: MutableList<DocumentSnapshot>) {
-        listings = newList
+        listings.clear()
+        listings.addAll(newList)
         notifyDataSetChanged()
-    }
-
-    /** Remove a single item after it has been claimed */
-    fun removeItem(docId: String) {
-        val index = listings.indexOfFirst { it.id == docId }
-        if (index != -1) {
-            listings.removeAt(index)
-            notifyItemRemoved(index)
-        }
     }
 }

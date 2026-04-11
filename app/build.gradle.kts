@@ -60,4 +60,6 @@ dependencies {
     // Coroutines for clean async code
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }

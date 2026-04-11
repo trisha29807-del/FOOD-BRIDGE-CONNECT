@@ -1,5 +1,6 @@
 package com.example.foodbridge
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
@@ -19,48 +20,64 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
         setupButtons()
+        setupHowItWorks()
         setupBottomNav()
     }
 
     private fun setupButtons() {
-        // Hero buttons
         findViewById<MaterialButton>(R.id.btnDonateFood).setOnClickListener {
             startActivity(Intent(this, DonateFoodActivity::class.java))
         }
-
         findViewById<MaterialButton>(R.id.btnFindFood).setOnClickListener {
-            // TODO: open BrowseActivity when built
             startActivity(Intent(this, BrowseActivity::class.java))
         }
-
-        // Quick action cards
         findViewById<android.view.View>(R.id.cardUploadFood).setOnClickListener {
             startActivity(Intent(this, DonateFoodActivity::class.java))
         }
-
         findViewById<android.view.View>(R.id.cardNearbyFood).setOnClickListener {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
     }
 
+    private fun setupHowItWorks() {
+        // Step 1 → DonateFoodActivity
+        findViewById<android.view.View>(R.id.cardStep1).setOnClickListener {
+            startActivity(Intent(this, DonateFoodActivity::class.java))
+        }
+
+        // Step 2 → BrowseActivity
+        findViewById<android.view.View>(R.id.cardStep2).setOnClickListener {
+            startActivity(Intent(this, BrowseActivity::class.java))
+        }
+
+        // Step 3 → Pickup info dialog
+        findViewById<android.view.View>(R.id.cardStep3).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Pickup & Delivery")
+                .setMessage(
+                    "Once you claim a food listing:\n\n" +
+                            "1. Contact the donor using their listed location\n\n" +
+                            "2. Coordinate a pickup time directly\n\n" +
+                            "3. Track your active orders in your Profile → My Orders\n\n" +
+                            "4. Mark as received once you collect the food"
+                )
+                .setPositiveButton("Track My Orders") { _, _ ->
+                    startActivity(Intent(this, TrackOrdersActivity::class.java))
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+    }
+
     private fun setupBottomNav() {
-        // Your XML uses bottomNav
         findViewById<BottomNavigationView>(R.id.bottomNav)
             .setOnItemSelectedListener { item ->
                 when (item.itemId) {
                     R.id.nav_home    -> true
-                    R.id.nav_donate  -> {
-                        startActivity(Intent(this, DonateFoodActivity::class.java)); true
-                    }
-                    R.id.nav_fssai   -> {
-                        startActivity(Intent(this, FssaiActivity::class.java)); true
-                    }
-                    R.id.nav_profile -> {
-                        startActivity(Intent(this, ProfileActivity::class.java)); true
-                    }
-                    R.id.nav_browse -> {
-                        startActivity(Intent(this, BrowseActivity::class.java)); true
-                    }
+                    R.id.nav_donate  -> { startActivity(Intent(this, DonateFoodActivity::class.java)); true }
+                    R.id.nav_browse  -> { startActivity(Intent(this, BrowseActivity::class.java)); true }
+                    R.id.nav_fssai   -> { startActivity(Intent(this, FssaiActivity::class.java)); true }
+                    R.id.nav_profile -> { startActivity(Intent(this, ProfileActivity::class.java)); true }
                     else -> false
                 }
             }
