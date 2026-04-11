@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.NestedScrollView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 
@@ -19,6 +20,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(R.layout.activity_main)
+
+        findViewById<NestedScrollView>(R.id.nestedScrollView)
+            .isNestedScrollingEnabled = true
+
         setupButtons()
         setupHowItWorks()
         setupBottomNav()
@@ -40,17 +45,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupHowItWorks() {
-        // Step 1 → DonateFoodActivity
         findViewById<android.view.View>(R.id.cardStep1).setOnClickListener {
             startActivity(Intent(this, DonateFoodActivity::class.java))
         }
-
-        // Step 2 → BrowseActivity
         findViewById<android.view.View>(R.id.cardStep2).setOnClickListener {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
-
-        // Step 3 → Pickup info dialog
         findViewById<android.view.View>(R.id.cardStep3).setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Pickup & Delivery")
@@ -61,9 +61,7 @@ class MainActivity : AppCompatActivity() {
                             "3. Track your active orders in your Profile → My Orders\n\n" +
                             "4. Mark as received once you collect the food"
                 )
-                .setPositiveButton("Track My Orders") { _, _ ->
-                    startActivity(Intent(this, TrackOrdersActivity::class.java))
-                }
+                .setPositiveButton("OK", null)
                 .setNegativeButton("Close", null)
                 .show()
         }

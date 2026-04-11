@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="btnLogout" type="id" />
+    <item name="tvFoodEmoji" type="id" />
+    <item name="tvFoodQuantity" type="id" />
+    <item name="tvFoodLocation" type="id" />
+    <item name="tvFoodExpiry" type="id" />
+    <item name="tvFoodDonor" type="id" />
 </resources>
