@@ -73,6 +73,10 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <activity android:name=".MyDonationsActivity" android:exported="false" />
+        <activity android:name=".MyOrdersActivity" android:exported="false" />
+        <activity android:name=".HistoryActivity" android:exported="false" />
+
     </application>
 
 </manifest>
