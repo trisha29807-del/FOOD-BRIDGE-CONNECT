@@ -8,22 +8,29 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.json.JSONArray
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MyDonationsActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutEmpty: LinearLayout
+    private val db = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_my_donations)
 
-        recyclerView  = findViewById(R.id.recyclerView)
-        layoutEmpty   = findViewById(R.id.layoutEmpty)
+        recyclerView = findViewById(R.id.recyclerView)
+        layoutEmpty  = findViewById(R.id.layoutEmpty)
 
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
 
@@ -31,62 +38,62 @@ class MyDonationsActivity : AppCompatActivity() {
         loadMyDonations()
     }
 
-    private fun loadMyDonations() {
-        val prefs    = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
-        val myName   = prefs.getString("user_name", "") ?: ""
-        val json     = prefs.getString("food_listings", "[]") ?: "[]"
-        val jsonArray = JSONArray(json)
-
-        val myItems = mutableListOf<FoodItem>()
-        for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            if (obj.optString("donor") == myName) {
-                myItems.add(FoodItem(
-                    id          = obj.getLong("id"),
-                    name        = obj.getString("name"),
-                    type        = obj.getString("type"),
-                    quantity    = obj.getString("quantity"),
-                    location    = obj.getString("location"),
-                    expiry      = obj.optString("expiry", ""),
-                    description = obj.optString("description", ""),
-                    donor       = obj.optString("donor", "Anonymous")
-                ))
-            }
-        }
-
-        if (myItems.isEmpty()) {
-            recyclerView.visibility = View.GONE
-            layoutEmpty.visibility  = View.VISIBLE
-        } else {
-            recyclerView.visibility = View.VISIBLE
-            layoutEmpty.visibility  = View.GONE
-            recyclerView.adapter    = DonationAdapter(myItems) { item ->
-                // Delete donation
-                deleteDonation(item.id)
-            }
-        }
+    override fun onResume() {
+        super.onResume()
+        loadMyDonations()
     }
 
-    private fun deleteDonation(id: Long) {
-        val prefs     = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
-        val json      = prefs.getString("food_listings", "[]") ?: "[]"
-        val jsonArray = JSONArray(json)
-        val newArray  = JSONArray()
+    private fun loadMyDonations() {
+        val uid = FirebaseHelper.currentUid ?: return
 
-        for (i in 0 until jsonArray.length()) {
-            val obj = jsonArray.getJSONObject(i)
-            if (obj.getLong("id") != id) newArray.put(obj)
-        }
+        db.collection("food_listings")
+            .whereEqualTo("donorUid", uid)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val docs = snapshot.documents
+                if (docs.isEmpty()) {
+                    recyclerView.visibility = View.GONE
+                    layoutEmpty.visibility  = View.VISIBLE
+                } else {
+                    recyclerView.visibility = View.VISIBLE
+                    layoutEmpty.visibility  = View.GONE
+                    recyclerView.adapter = DonationAdapter(docs) { doc ->
+                        confirmDelete(doc)
+                    }
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Could not load donations", Toast.LENGTH_SHORT).show()
+                layoutEmpty.visibility = View.VISIBLE
+            }
+    }
 
-        prefs.edit().putString("food_listings", newArray.toString()).apply()
-        android.widget.Toast.makeText(this, "Donation removed", android.widget.Toast.LENGTH_SHORT).show()
-        loadMyDonations()
+    private fun confirmDelete(doc: DocumentSnapshot) {
+        AlertDialog.Builder(this)
+            .setTitle("Remove listing")
+            .setMessage("Remove \"${doc.getString("foodName")}\" from available listings?")
+            .setPositiveButton("Remove") { _, _ -> deleteDonation(doc.id) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun deleteDonation(docId: String) {
+        db.collection("food_listings").document(docId)
+            .update("status", "removed")
+            .addOnSuccessListener {
+                Toast.makeText(this, "Listing removed", Toast.LENGTH_SHORT).show()
+                loadMyDonations()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to remove listing", Toast.LENGTH_SHORT).show()
+            }
     }
 }
 
 class DonationAdapter(
-    private val items: List<FoodItem>,
-    private val onDelete: (FoodItem) -> Unit
+    private val items: List<DocumentSnapshot>,
+    private val onDelete: (DocumentSnapshot) -> Unit
 ) : RecyclerView.Adapter<DonationAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -97,6 +104,7 @@ class DonationAdapter(
         val tvLocation: TextView = view.findViewById(R.id.tvFoodLocation)
         val tvExpiry:   TextView = view.findViewById(R.id.tvFoodExpiry)
         val tvDonor:    TextView = view.findViewById(R.id.tvFoodDonor)
+        val tvStatus:   TextView = view.findViewById(R.id.tvStatus)
         val btnDelete:  TextView = view.findViewById(R.id.btnDelete)
     }
 
@@ -106,19 +114,43 @@ class DonationAdapter(
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val item = items[position]
-        holder.tvEmoji.text    = getFoodEmoji(item.type)
-        holder.tvName.text     = item.name
-        holder.tvType.text     = item.type
-        holder.tvQuantity.text = "📦 ${item.quantity}"
-        holder.tvLocation.text = "📍 ${item.location}"
-        holder.tvExpiry.text   = if (item.expiry.isNotEmpty()) "⏰ ${item.expiry}" else ""
-        holder.tvDonor.text    = "👤 ${item.donor}"
-        holder.btnDelete.setOnClickListener { onDelete(item) }
-    }
-
     override fun getItemCount() = items.size
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val doc  = items[position]
+        val type = doc.getString("foodType") ?: ""
+
+        holder.tvEmoji.text    = getFoodEmoji(type)
+        holder.tvName.text     = doc.getString("foodName")  ?: "Unknown"
+        holder.tvType.text     = type
+        holder.tvQuantity.text = "📦 ${doc.getString("quantity") ?: ""}"
+        holder.tvLocation.text = "📍 ${doc.getString("location") ?: "Location not set"}"
+        holder.tvDonor.text    = "👤 ${doc.getString("donorName") ?: "You"}"
+
+        val expiry = doc.getTimestamp("expiryDate")
+        if (expiry != null) {
+            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+            holder.tvExpiry.text = "⏰ ${sdf.format(expiry.toDate())}"
+        } else {
+            holder.tvExpiry.text = ""
+        }
+
+        val status = doc.getString("status") ?: "available"
+        holder.tvStatus.text = when (status) {
+            "available" -> "🟢 Available"
+            "claimed"   -> "🟡 Claimed"
+            "received"  -> "✅ Received"
+            else        -> status
+        }
+
+        // Only allow delete if still available
+        if (status == "available") {
+            holder.btnDelete.visibility = View.VISIBLE
+            holder.btnDelete.setOnClickListener { onDelete(doc) }
+        } else {
+            holder.btnDelete.visibility = View.GONE
+        }
+    }
 
     private fun getFoodEmoji(type: String): String = when {
         type.contains("Cooked",    ignoreCase = true) -> "🍱"

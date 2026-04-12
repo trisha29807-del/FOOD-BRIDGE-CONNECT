@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#F5F5EE">
+
+    <!-- Success icon -->
+    <TextView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:text="✅"
+        android:textSize="48sp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Order Placed!"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:textColor="#2E7D32"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Your order has been confirmed."
+        android:textSize="14sp"
+        android:textColor="#888888"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Order details card -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#FFFFFF">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/tvFoodName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dal Rice"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#222222"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvDonorName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="From: Priya"
+                android:textSize="13sp"
+                android:textColor="#555555"
+                android:layout_marginBottom="6dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#F0F0F0"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:id="@+id/tvAddress"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📍 Delhi"
+                android:textSize="13sp"
+                android:textColor="#555555"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tvContact"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📞 9876543210"
+                android:textSize="13sp"
+                android:textColor="#555555"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tvPaymentMethod"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💳 Cash on Delivery"
+                android:textSize="13sp"
+                android:textColor="#555555" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnTrackOrder"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="Track My Order"
+        android:textSize="15sp"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#2E7D32"
+        app:cornerRadius="14dp"
+        android:stateListAnimator="@null"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnGoHome"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="Back to Home"
+        android:textSize="15sp"
+        android:textColor="#2E7D32"
+        app:backgroundTint="#E8F5E9"
+        app:cornerRadius="14dp"
+        android:stateListAnimator="@null" />
+
+</LinearLayout>
