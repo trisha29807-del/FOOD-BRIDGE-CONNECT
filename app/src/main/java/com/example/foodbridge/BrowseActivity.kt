@@ -1,8 +1,6 @@
 package com.example.foodbridge
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -12,23 +10,19 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import kotlin.math.*
+import java.text.SimpleDateFormat
+import java.util.*
 
 class BrowseActivity : AppCompatActivity() {
 
@@ -36,88 +30,48 @@ class BrowseActivity : AppCompatActivity() {
     private lateinit var chipGroup: ChipGroup
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutEmpty: LinearLayout
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var adapter: BrowseAdapter
 
     private val db = FirebaseFirestore.getInstance()
     private var allListings = mutableListOf<DocumentSnapshot>()
     private var selectedFilter = "All"
-    private var userLat = 0.0
-    private var userLng = 0.0
-    private var hasLocation = false
-    private lateinit var adapter: FoodAdapter
-
-    private val locationPermLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) fetchLocationThenLoad() else loadListings()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_browse)
-
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         etSearch     = findViewById(R.id.etSearch)
         chipGroup    = findViewById(R.id.chipGroup)
         recyclerView = findViewById(R.id.recyclerView)
         layoutEmpty  = findViewById(R.id.layoutEmpty)
 
-        adapter = FoodAdapter(mutableListOf())
+        adapter = BrowseAdapter(mutableListOf()) { doc -> openPlaceOrder(doc) }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
         setupChips()
         setupSearch()
         setupBottomNav()
-        requestLocationThenLoad()
+        loadListings()
     }
 
-    // ── Location ──────────────────────────────────────────────────────────────
-
-    private fun requestLocationThenLoad() {
-        val fine   = Manifest.permission.ACCESS_FINE_LOCATION
-        val coarse = Manifest.permission.ACCESS_COARSE_LOCATION
-        val hasFine   = ContextCompat.checkSelfPermission(this, fine)   == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(this, coarse) == PackageManager.PERMISSION_GRANTED
-        if (hasFine || hasCoarse) fetchLocationThenLoad()
-        else locationPermLauncher.launch(arrayOf(fine, coarse))
+    override fun onResume() {
+        super.onResume()
+        loadListings()
     }
 
-    private fun fetchLocationThenLoad() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            loadListings(); return
+    private fun openPlaceOrder(doc: DocumentSnapshot) {
+        val intent = Intent(this, PlaceOrderActivity::class.java).apply {
+            putExtra("listingId", doc.id)
+            putExtra("foodName",  doc.getString("foodName")  ?: "")
+            putExtra("donorUid",  doc.getString("donorUid")  ?: "")
+            putExtra("donorName", doc.getString("donorName") ?: "")
+            putExtra("quantity",  doc.getString("quantity")  ?: "")
+            putExtra("location",  doc.getString("location")  ?: "")
+            putExtra("foodType",  doc.getString("foodType")  ?: "")
         }
-        val cts = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    userLat = location.latitude
-                    userLng = location.longitude
-                    hasLocation = true
-                }
-                loadListings()
-            }
-            .addOnFailureListener { loadListings() }
+        startActivity(intent)
     }
-
-    // ── Haversine distance (km) ───────────────────────────────────────────────
-
-    private fun distanceKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val r = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
-        return r * 2 * asin(sqrt(a))
-    }
-
-    // ── Firestore fetch ───────────────────────────────────────────────────────
 
     private fun loadListings() {
         db.collection("food_listings")
@@ -126,52 +80,48 @@ class BrowseActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { snapshot ->
                 allListings = snapshot.documents.toMutableList()
-
-                // Sort by distance if we have user location
-                if (hasLocation) {
-                    allListings.sortBy { doc ->
-                        val lat = doc.getDouble("latitude") ?: 0.0
-                        val lng = doc.getDouble("longitude") ?: 0.0
-                        if (lat == 0.0 && lng == 0.0) Double.MAX_VALUE
-                        else distanceKm(userLat, userLng, lat, lng)
-                    }
-                }
                 applyFilters()
             }
-            .addOnFailureListener {
-                Toast.makeText(this, "Failed to load listings", Toast.LENGTH_SHORT).show()
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to load: ${e.message}", Toast.LENGTH_LONG).show()
                 showEmpty(true)
             }
     }
-
-    // ── Filter + Search ───────────────────────────────────────────────────────
 
     private fun applyFilters() {
         val query = etSearch.text?.toString()?.trim()?.lowercase().orEmpty()
 
         val filtered = allListings.filter { doc ->
-            val type = doc.getString("foodType") ?: ""
+            val type  = doc.getString("foodType") ?: ""
+            val isVeg = doc.getBoolean("isVeg")   // null = old listing without this field
+
             val matchesFilter = when (selectedFilter) {
                 "All"        -> true
-                "Cooked"     -> type.contains("Cooked", ignoreCase = true)
-                "Fruits/Veg" -> type.contains("Fruit", ignoreCase = true) ||
-                        type.contains("Vegetable", ignoreCase = true)
-                "Packed"     -> type.contains("Bakery", ignoreCase = true) ||
-                        type.contains("Grain", ignoreCase = true) ||
-                        type.contains("Beverage", ignoreCase = true)
-                "Veg"        -> !type.contains("Non", ignoreCase = true)
-                "Non-Veg"    -> type.contains("Non", ignoreCase = true)
+                // Veg/Non-Veg use the saved isVeg boolean — accurate
+                "Veg"        -> isVeg == true
+                "Non-Veg"    -> isVeg == false
+                // Category filters use foodType string
+                "Cooked"     -> type.contains("Cooked",    ignoreCase = true)
+                "Fruits/Veg" -> type.contains("Fruit",     ignoreCase = true) ||
+                        type.contains("Vegetable", ignoreCase = true) ||
+                        type.contains("Raw",       ignoreCase = true)
+                "Packed"     -> type.contains("Bakery",    ignoreCase = true) ||
+                        type.contains("Grain",     ignoreCase = true) ||
+                        type.contains("Beverage",  ignoreCase = true) ||
+                        type.contains("Dairy",     ignoreCase = true)
                 else         -> true
             }
+
             val matchesSearch = query.isEmpty() ||
                     (doc.getString("foodName") ?.lowercase()?.contains(query) == true) ||
                     (doc.getString("location") ?.lowercase()?.contains(query) == true) ||
-                    (doc.getString("foodType") ?.lowercase()?.contains(query) == true)
+                    (doc.getString("foodType") ?.lowercase()?.contains(query) == true) ||
+                    (doc.getString("donorName")?.lowercase()?.contains(query) == true)
 
             matchesFilter && matchesSearch
         }.toMutableList()
 
-        adapter.updateItems(filtered, userLat, userLng, hasLocation)
+        adapter.updateItems(filtered)
         showEmpty(filtered.isEmpty())
     }
 
@@ -179,8 +129,6 @@ class BrowseActivity : AppCompatActivity() {
         layoutEmpty.visibility  = if (empty) View.VISIBLE else View.GONE
         recyclerView.visibility = if (empty) View.GONE    else View.VISIBLE
     }
-
-    // ── Chips ─────────────────────────────────────────────────────────────────
 
     private fun setupChips() {
         val filters = listOf("All", "Veg", "Non-Veg", "Cooked", "Packed", "Fruits/Veg")
@@ -228,92 +176,80 @@ class BrowseActivity : AppCompatActivity() {
     }
 }
 
-// ── Adapter ───────────────────────────────────────────────────────────────────
 
-class FoodAdapter(private val items: MutableList<DocumentSnapshot>) :
-    RecyclerView.Adapter<FoodAdapter.ViewHolder>() {
+class BrowseAdapter(
+    private val items: MutableList<DocumentSnapshot>,
+    private val onOrder: (DocumentSnapshot) -> Unit
+) : RecyclerView.Adapter<BrowseAdapter.ViewHolder>() {
 
-    private var userLat = 0.0
-    private var userLng = 0.0
-    private var hasLocation = false
-
-    fun updateItems(
-        newItems: List<DocumentSnapshot>,
-        lat: Double, lng: Double, hasLoc: Boolean
-    ) {
-        items.clear(); items.addAll(newItems)
-        userLat = lat; userLng = lng; hasLocation = hasLoc
+    fun updateItems(newItems: List<DocumentSnapshot>) {
+        items.clear()
+        items.addAll(newItems)
         notifyDataSetChanged()
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val tvEmoji:    TextView = view.findViewById(R.id.tvFoodEmoji)
-        val tvName:     TextView = view.findViewById(R.id.tvFoodName)
-        val tvType:     TextView = view.findViewById(R.id.tvFoodType)
-        val tvQuantity: TextView = view.findViewById(R.id.tvFoodQuantity)
-        val tvLocation: TextView = view.findViewById(R.id.tvFoodLocation)
-        val tvExpiry:   TextView = view.findViewById(R.id.tvFoodExpiry)
-        val tvDonor:    TextView = view.findViewById(R.id.tvFoodDonor)
-        val tvDistance: TextView = view.findViewById(R.id.tvFoodDistance)
+        val tvFoodName:    TextView       = view.findViewById(R.id.tvFoodName)
+        val tvFoodType:    TextView       = view.findViewById(R.id.tvFoodType)
+        val tvDonorName:   TextView       = view.findViewById(R.id.tvDonorName)
+        val tvLocation:    TextView       = view.findViewById(R.id.tvLocation)
+        val tvQuantity:    TextView       = view.findViewById(R.id.tvQuantity)
+        val tvExpiry:      TextView       = view.findViewById(R.id.tvExpiry)
+        val tvDescription: TextView       = view.findViewById(R.id.tvDescription)
+        val tvDistance:    TextView       = view.findViewById(R.id.tvDistance)
+        val tvVegBadge:    TextView       = view.findViewById(R.id.tvVegBadge)
+        val btnClaim:      MaterialButton = view.findViewById(R.id.btnClaim)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         ViewHolder(LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_food_card, parent, false))
+            .inflate(R.layout.item_food_listing, parent, false))
 
     override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val doc = items[position]
+        val doc  = items[position]
         val type = doc.getString("foodType") ?: ""
+        val isVeg = doc.getBoolean("isVeg")
 
-        holder.tvEmoji.text    = getFoodEmoji(type)
-        holder.tvName.text     = doc.getString("foodName") ?: "Unknown"
-        holder.tvType.text     = type
-        holder.tvQuantity.text = "📦 ${doc.getString("quantity") ?: ""}"
-        holder.tvLocation.text = "📍 ${doc.getString("location") ?: "Location not set"}"
-        holder.tvDonor.text    = "👤 ${doc.getString("donorName") ?: "Anonymous"}"
+        holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
+        holder.tvFoodType.text  = type
+        holder.tvDonorName.text = doc.getString("donorName") ?: "Anonymous"
+        holder.tvLocation.text  = doc.getString("location")  ?: "Location not set"
+        holder.tvQuantity.text  = doc.getString("quantity")  ?: ""
+        holder.tvDistance.visibility = View.GONE
+
+        // Veg / Non-Veg badge
+        when (isVeg) {
+            true  -> {
+                holder.tvVegBadge.text = "🟢 Veg"
+                holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt())
+                holder.tvVegBadge.visibility = View.VISIBLE
+            }
+            false -> {
+                holder.tvVegBadge.text = "🔴 Non-Veg"
+                holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt())
+                holder.tvVegBadge.visibility = View.VISIBLE
+            }
+            null  -> holder.tvVegBadge.visibility = View.GONE
+        }
 
         val expiry = doc.getTimestamp("expiryDate")
-        if (expiry != null) {
-            val sdf = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.getDefault())
-            holder.tvExpiry.text = "⏰ ${sdf.format(expiry.toDate())}"
+        holder.tvExpiry.text = if (expiry != null) {
+            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+            sdf.format(expiry.toDate())
+        } else "N/A"
+
+        val desc = doc.getString("description")
+        if (!desc.isNullOrEmpty()) {
+            holder.tvDescription.text = desc
+            holder.tvDescription.visibility = View.VISIBLE
         } else {
-            holder.tvExpiry.text = ""
+            holder.tvDescription.visibility = View.GONE
         }
 
-        // Show distance if we have location for both user and listing
-        val listingLat = doc.getDouble("latitude") ?: 0.0
-        val listingLng = doc.getDouble("longitude") ?: 0.0
-        if (hasLocation && listingLat != 0.0 && listingLng != 0.0) {
-            val dist = distanceKm(userLat, userLng, listingLat, listingLng)
-            holder.tvDistance.text = if (dist < 1.0)
-                "📌 ${(dist * 1000).toInt()} m away"
-            else
-                "📌 ${String.format("%.1f", dist)} km away"
-            holder.tvDistance.visibility = View.VISIBLE
-        } else {
-            holder.tvDistance.visibility = View.GONE
-        }
-    }
-
-    private fun distanceKm(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val r = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
-        return r * 2 * asin(sqrt(a))
-    }
-
-    private fun getFoodEmoji(type: String): String = when {
-        type.contains("Cooked",    ignoreCase = true) -> "🍱"
-        type.contains("Fruit",     ignoreCase = true) -> "🍎"
-        type.contains("Vegetable", ignoreCase = true) -> "🥦"
-        type.contains("Grain",     ignoreCase = true) -> "🌾"
-        type.contains("Dairy",     ignoreCase = true) -> "🥛"
-        type.contains("Bakery",    ignoreCase = true) -> "🍞"
-        type.contains("Beverage",  ignoreCase = true) -> "🥤"
-        else                                           -> "🍽️"
+        holder.btnClaim.isEnabled = true
+        holder.btnClaim.text = "Order / Claim"
+        holder.btnClaim.setOnClickListener { onOrder(doc) }
     }
 }

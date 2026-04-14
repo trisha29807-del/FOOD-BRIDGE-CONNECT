@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.text.SimpleDateFormat
@@ -35,10 +36,14 @@ class TrackOrdersActivity : AppCompatActivity() {
         layoutEmpty  = findViewById(R.id.layoutEmpty)
 
         findViewById<android.view.View>(R.id.btnBack).setOnClickListener { finish() }
-
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         setupBottomNav()
+        loadOrders()
+    }
+
+    override fun onResume() {
+        super.onResume()
         loadOrders()
     }
 
@@ -46,10 +51,10 @@ class TrackOrdersActivity : AppCompatActivity() {
         val uid = FirebaseHelper.currentUid ?: return
         progressBar.visibility = View.VISIBLE
 
-        // Load both claimed listings (by this user) and donated listings (by this user)
-        db.collection("food_listings")
-            .whereEqualTo("claimedByUid", uid)
-            .orderBy("claimedAt", Query.Direction.DESCENDING)
+        // Query the orders collection (saved by PlaceOrderActivity)
+        db.collection("orders")
+            .whereEqualTo("buyerUid", uid)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
                 progressBar.visibility = View.GONE
@@ -60,13 +65,27 @@ class TrackOrdersActivity : AppCompatActivity() {
                 } else {
                     layoutEmpty.visibility  = View.GONE
                     recyclerView.visibility = View.VISIBLE
-                    recyclerView.adapter = OrderAdapter(orders)
+                    recyclerView.adapter = TrackAdapter(orders) { docId ->
+                        markAsReceived(docId)
+                    }
                 }
             }
-            .addOnFailureListener {
+            .addOnFailureListener { e ->
                 progressBar.visibility = View.GONE
-                Toast.makeText(this, "Could not load orders", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Could not load orders: ${e.message}", Toast.LENGTH_SHORT).show()
                 layoutEmpty.visibility = View.VISIBLE
+            }
+    }
+
+    private fun markAsReceived(orderId: String) {
+        db.collection("orders").document(orderId)
+            .update("orderStatus", "received")
+            .addOnSuccessListener {
+                Toast.makeText(this, "Marked as received!", Toast.LENGTH_SHORT).show()
+                loadOrders()
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Update failed", Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -83,70 +102,57 @@ class TrackOrdersActivity : AppCompatActivity() {
                 }
             }
     }
+}
 
-    // ── Inline adapter ────────────────────────────────────────────────────────
-    inner class OrderAdapter(
-        private val orders: List<com.google.firebase.firestore.DocumentSnapshot>
-    ) : RecyclerView.Adapter<OrderAdapter.VH>() {
+class TrackAdapter(
+    private val orders: List<DocumentSnapshot>,
+    private val onMarkReceived: (String) -> Unit
+) : RecyclerView.Adapter<TrackAdapter.VH>() {
 
-        inner class VH(view: View) : RecyclerView.ViewHolder(view) {
-            val tvFoodName:   TextView       = view.findViewById(R.id.tvFoodName)
-            val tvDonorName:  TextView       = view.findViewById(R.id.tvDonorName)
-            val tvLocation:   TextView       = view.findViewById(R.id.tvLocation)
-            val tvStatus:     TextView       = view.findViewById(R.id.tvStatus)
-            val tvClaimedAt:  TextView       = view.findViewById(R.id.tvClaimedAt)
-            val btnMarkDone:  MaterialButton = view.findViewById(R.id.btnMarkDone)
+    inner class VH(view: View) : RecyclerView.ViewHolder(view) {
+        val tvFoodName:    TextView       = view.findViewById(R.id.tvFoodName)
+        val tvDonorName:   TextView       = view.findViewById(R.id.tvDonorName)
+        val tvLocation:    TextView       = view.findViewById(R.id.tvLocation)
+        val tvAddress:     TextView       = view.findViewById(R.id.tvAddress)
+        val tvPayment:     TextView       = view.findViewById(R.id.tvPayment)
+        val tvStatus:      TextView       = view.findViewById(R.id.tvStatus)
+        val tvClaimedAt:   TextView       = view.findViewById(R.id.tvClaimedAt)
+        val btnMarkDone:   MaterialButton = view.findViewById(R.id.btnMarkDone)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+        VH(LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_track_order, parent, false))
+
+    override fun getItemCount() = orders.size
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        val doc = orders[position]
+
+        holder.tvFoodName.text  = doc.getString("foodName")        ?: "Unknown"
+        holder.tvDonorName.text = "From: ${doc.getString("donorName") ?: "Anonymous"}"
+        holder.tvLocation.text  = "📍 Pickup: ${doc.getString("pickupLocation") ?: ""}"
+        holder.tvAddress.text   = "🏠 Deliver to: ${doc.getString("deliveryAddress") ?: ""}"
+        holder.tvPayment.text   = "💳 ${doc.getString("paymentMethod") ?: "Cash on Delivery"}"
+
+        val status = doc.getString("orderStatus") ?: "confirmed"
+        holder.tvStatus.text = when (status) {
+            "confirmed" -> "🟡 Confirmed — awaiting pickup"
+            "received"  -> "✅ Received"
+            else        -> status
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-            VH(LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_order, parent, false))
+        val ts = doc.getTimestamp("createdAt")
+        if (ts != null) {
+            val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+            holder.tvClaimedAt.text = "Ordered on: ${sdf.format(ts.toDate())}"
+        }
 
-        override fun getItemCount() = orders.size
-
-        override fun onBindViewHolder(holder: VH, position: Int) {
-            val doc = orders[position]
-            holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
-            holder.tvDonorName.text = "From: ${doc.getString("donorName") ?: "Anonymous"}"
-            holder.tvLocation.text  = "📍 ${doc.getString("location") ?: "Location not set"}"
-
-            val status = doc.getString("status") ?: "claimed"
-            holder.tvStatus.text = when (status) {
-                "claimed"   -> "🟡 Claimed — awaiting pickup"
-                "received"  -> "🟢 Received"
-                else        -> status
-            }
-            holder.tvStatus.setTextColor(
-                if (status == "received")
-                    getColor(android.R.color.holo_green_dark)
-                else
-                    getColor(android.R.color.holo_orange_dark)
-            )
-
-            val claimedAt = doc.getTimestamp("claimedAt")
-            if (claimedAt != null) {
-                val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-                holder.tvClaimedAt.text = "Claimed on: ${sdf.format(claimedAt.toDate())}"
-            }
-
-            // Hide Mark Done if already received
-            if (status == "received") {
-                holder.btnMarkDone.visibility = View.GONE
-            } else {
-                holder.btnMarkDone.visibility = View.VISIBLE
-                holder.btnMarkDone.setOnClickListener {
-                    db.collection("food_listings").document(doc.id)
-                        .update("status", "received")
-                        .addOnSuccessListener {
-                            Toast.makeText(
-                                this@TrackOrdersActivity,
-                                "Marked as received!",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            loadOrders()
-                        }
-                }
-            }
+        if (status == "received") {
+            holder.btnMarkDone.visibility = View.GONE
+        } else {
+            holder.btnMarkDone.visibility = View.VISIBLE
+            holder.btnMarkDone.setOnClickListener { onMarkReceived(doc.id) }
         }
     }
 }

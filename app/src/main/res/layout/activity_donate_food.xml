@@ -130,6 +130,46 @@
                             android:textColor="#333333" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Add this block AFTER the Food Name TextInputLayout and BEFORE the Food Type + Quantity row -->
+                    <!-- Veg / Non-Veg selector -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Food Category"
+                        android:textSize="13sp"
+                        android:textColor="#555555"
+                        android:layout_marginBottom="6dp" />
+
+                    <RadioGroup
+                        android:id="@+id/rgVegType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="16dp">
+
+                        <RadioButton
+                            android:id="@+id/rbVeg"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="🟢  Veg"
+                            android:textSize="14sp"
+                            android:textColor="#2E7D32"
+                            android:checked="true"
+                            android:buttonTint="#2E7D32" />
+
+                        <RadioButton
+                            android:id="@+id/rbNonVeg"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="🔴  Non-Veg"
+                            android:textSize="14sp"
+                            android:textColor="#C62828"
+                            android:buttonTint="#C62828" />
+
+                    </RadioGroup>
+
                     <!-- Food Type + Quantity Row -->
                     <LinearLayout
                         android:layout_width="match_parent"

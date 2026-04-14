@@ -26,7 +26,7 @@ class OrderConfirmationActivity : AppCompatActivity() {
 
         // Track order button
         findViewById<MaterialButton>(R.id.btnTrackOrder).setOnClickListener {
-            startActivity(Intent(this, MyOrdersActivity::class.java))
+            startActivity(Intent(this, TrackOrdersActivity::class.java))
             finish()
         }
 

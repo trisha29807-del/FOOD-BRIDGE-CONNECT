@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.cardNearbyFood).setOnClickListener {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
+        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fabCart)
+            .setOnClickListener {
+                startActivity(Intent(this, TrackOrdersActivity::class.java))
+            }
     }
 
     private fun setupHowItWorks() {

@@ -419,4 +419,19 @@
         app:itemTextColor="#2E7D32"
         app:menu="@menu/bottom_nav_menu" />
 
+    <!-- Add this AFTER the BottomNavigationView in activity_main.xml -->
+    <!-- Floating cart button — bottom right corner -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabCart"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="72dp"
+        android:layout_marginEnd="16dp"
+        android:src="@android:drawable/ic_menu_agenda"
+        android:contentDescription="My Orders"
+        app:backgroundTint="#2E7D32"
+        app:tint="#FFFFFF"
+        app:elevation="6dp" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

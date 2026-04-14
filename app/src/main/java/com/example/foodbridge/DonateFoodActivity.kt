@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,10 +16,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -43,15 +38,14 @@ class DonateFoodActivity : AppCompatActivity() {
     private lateinit var btnListFood: MaterialButton
     private lateinit var btnAddPhoto: LinearLayout
     private lateinit var ivFoodPhoto: ImageView
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var rgVegType: RadioGroup
+    private lateinit var rbVeg: RadioButton
+    private lateinit var rbNonVeg: RadioButton
 
     private var selectedExpiryMillis: Long = 0L
     private var selectedImageUri: Uri? = null
     private var cameraImageUri: Uri? = null
-    private var donorLat: Double = 0.0
-    private var donorLng: Double = 0.0
 
-    // ── Camera launcher ───────────────────────────────────────────────────────
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
@@ -61,7 +55,6 @@ class DonateFoodActivity : AppCompatActivity() {
         }
     }
 
-    // ── Gallery launcher ──────────────────────────────────────────────────────
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -71,7 +64,6 @@ class DonateFoodActivity : AppCompatActivity() {
         }
     }
 
-    // ── Camera permission ─────────────────────────────────────────────────────
     private val cameraPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -79,23 +71,9 @@ class DonateFoodActivity : AppCompatActivity() {
         else Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
     }
 
-    // ── Location permission ───────────────────────────────────────────────────
-    private val locationPermLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) fetchLocation()
-        else Toast.makeText(this,
-            "Location permission denied — coordinates won't be saved",
-            Toast.LENGTH_SHORT).show()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_donate_food)
-
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         bindViews()
         setupFoodTypeSpinner()
@@ -103,7 +81,6 @@ class DonateFoodActivity : AppCompatActivity() {
         setupPhotoButton()
         setupSubmit()
         setupBottomNav()
-        requestLocationAndFetch()
 
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
     }
@@ -118,40 +95,10 @@ class DonateFoodActivity : AppCompatActivity() {
         btnListFood     = findViewById(R.id.btnListFood)
         btnAddPhoto     = findViewById(R.id.btnAddPhoto)
         ivFoodPhoto     = findViewById(R.id.ivFoodPhoto)
+        rgVegType       = findViewById(R.id.rgVegType)
+        rbVeg           = findViewById(R.id.rbVeg)
+        rbNonVeg        = findViewById(R.id.rbNonVeg)
     }
-
-    // ── Location ──────────────────────────────────────────────────────────────
-
-    private fun requestLocationAndFetch() {
-        val fine   = Manifest.permission.ACCESS_FINE_LOCATION
-        val coarse = Manifest.permission.ACCESS_COARSE_LOCATION
-        val hasFine   = ContextCompat.checkSelfPermission(this, fine)   == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(this, coarse) == PackageManager.PERMISSION_GRANTED
-        if (hasFine || hasCoarse) fetchLocation()
-        else locationPermLauncher.launch(arrayOf(fine, coarse))
-    }
-
-    private fun fetchLocation() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-
-        val cts = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    donorLat = location.latitude
-                    donorLng = location.longitude
-                    // Pre-fill location field with coordinates if empty
-                    if (etLocation.text.isNullOrEmpty()) {
-                        etLocation.setText("${String.format("%.4f", donorLat)}, ${String.format("%.4f", donorLng)}")
-                    }
-                }
-            }
-    }
-
-    // ── Food type spinner ─────────────────────────────────────────────────────
 
     private fun setupFoodTypeSpinner() {
         val types = listOf(
@@ -162,8 +109,6 @@ class DonateFoodActivity : AppCompatActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerFoodType.adapter = adapter
     }
-
-    // ── Expiry picker ─────────────────────────────────────────────────────────
 
     private fun setupExpiryPicker() {
         etExpiry.setOnClickListener {
@@ -178,8 +123,6 @@ class DonateFoodActivity : AppCompatActivity() {
             }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
         }
     }
-
-    // ── Photo button ──────────────────────────────────────────────────────────
 
     private fun setupPhotoButton() {
         btnAddPhoto.setOnClickListener {
@@ -215,8 +158,6 @@ class DonateFoodActivity : AppCompatActivity() {
         ivFoodPhoto.visibility = View.VISIBLE
     }
 
-    // ── Image upload ──────────────────────────────────────────────────────────
-
     private suspend fun uploadImage(uid: String): String {
         val uri = selectedImageUri ?: return ""
         val ref = FirebaseStorage.getInstance().reference
@@ -227,8 +168,6 @@ class DonateFoodActivity : AppCompatActivity() {
         } catch (e: Exception) { "" }
     }
 
-    // ── Submit listing ────────────────────────────────────────────────────────
-
     private fun setupSubmit() {
         btnListFood.setOnClickListener {
             val foodName    = etFoodName.text.toString().trim()
@@ -236,6 +175,7 @@ class DonateFoodActivity : AppCompatActivity() {
             val location    = etLocation.text.toString().trim()
             val description = etDescription.text.toString().trim()
             val foodType    = spinnerFoodType.selectedItem.toString()
+            val isVeg       = rgVegType.checkedRadioButtonId == R.id.rbVeg
 
             var isValid = true
             if (foodName.isEmpty()) { etFoodName.error = "Food name is required"; isValid = false }
@@ -269,13 +209,12 @@ class DonateFoodActivity : AppCompatActivity() {
                     "donorName"   to donorName,
                     "foodName"    to foodName,
                     "foodType"    to foodType,
+                    "isVeg"       to isVeg,          // ← new field
                     "quantity"    to quantity,
                     "location"    to location,
                     "description" to description,
                     "status"      to "available",
                     "imageUrl"    to imageUrl,
-                    "latitude"    to donorLat,   // ← GPS coordinates saved here
-                    "longitude"   to donorLng,
                     "createdAt"   to Timestamp.now(),
                     "expiryDate"  to Timestamp(Date(selectedExpiryMillis))
                 )
