@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.example.foodbridge">
     <!-- Inside <manifest> before <application> -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- For Android 12 and below -->
@@ -91,6 +96,10 @@
 
         <activity android:name="com.example.foodbridge.PlaceOrderActivity" android:exported="false" />
         <activity android:name="com.example.foodbridge.OrderConfirmationActivity" android:exported="false" />
+
+        <activity android:name=".CartActivity" android:exported="false" />
+        <activity android:name=".PlaceOrderActivity" android:exported="false"
+            tools:ignore="DuplicateActivity" />
 
 
     </application>

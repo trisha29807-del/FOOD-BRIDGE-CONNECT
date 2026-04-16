@@ -1,5 +1,6 @@
 package com.example.foodbridge
 
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -7,14 +8,13 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.bumptech.glide.Glide
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
@@ -23,9 +23,10 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import android.widget.ImageView
 
 class BrowseActivity : AppCompatActivity() {
 
@@ -33,8 +34,9 @@ class BrowseActivity : AppCompatActivity() {
     private lateinit var chipGroup: ChipGroup
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutEmpty: LinearLayout
-    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var adapter: BrowseAdapter
+    private lateinit var tvCartCount: TextView
+    private lateinit var btnCart: FrameLayout
 
     private val db = FirebaseFirestore.getInstance()
     private var allListings = mutableListOf<DocumentSnapshot>()
@@ -48,16 +50,19 @@ class BrowseActivity : AppCompatActivity() {
         chipGroup    = findViewById(R.id.chipGroup)
         recyclerView = findViewById(R.id.recyclerView)
         layoutEmpty  = findViewById(R.id.layoutEmpty)
-        swipeRefresh = findViewById(R.id.swipeRefresh)
+        tvCartCount  = findViewById(R.id.tvCartCount)
+        btnCart      = findViewById(R.id.btnCart)
 
-        adapter = BrowseAdapter(mutableListOf()) { doc -> openPlaceOrder(doc) }
+        adapter = BrowseAdapter(
+            mutableListOf(),
+            onOrder  = { doc -> openPlaceOrder(doc) },
+            onAddCart = { doc -> addToCart(doc) }
+        )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        // Pull to refresh
-        swipeRefresh.setColorSchemeColors(getColor(R.color.green_primary))
-        swipeRefresh.setOnRefreshListener {
-            loadListings()
+        btnCart.setOnClickListener {
+            startActivity(Intent(this, CartActivity::class.java))
         }
 
         setupChips()
@@ -69,7 +74,57 @@ class BrowseActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadListings()
+        updateCartBadge()
     }
+
+    // ── Cart helpers ─────────────────────────────────────────────────────────
+
+    private fun updateCartBadge() {
+        val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val count = JSONArray(prefs.getString("cart_items", "[]") ?: "[]").length()
+        if (count > 0) {
+            tvCartCount.visibility = View.VISIBLE
+            tvCartCount.text = count.toString()
+        } else {
+            tvCartCount.visibility = View.GONE
+        }
+    }
+
+    private fun addToCart(doc: DocumentSnapshot) {
+        val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val arr   = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
+
+        // Duplicate check
+        for (i in 0 until arr.length()) {
+            if (arr.getJSONObject(i).getString("id") == doc.id) {
+                Toast.makeText(this, "Already in cart!", Toast.LENGTH_SHORT).show()
+                return
+            }
+        }
+
+        val obj = JSONObject().apply {
+            put("id",          doc.id)
+            put("name",        doc.getString("foodName")  ?: "")
+            put("type",        doc.getString("foodType")  ?: "")
+            put("quantity",    doc.getString("quantity")  ?: "")
+            put("location",    doc.getString("location")  ?: "")
+            put("donor",       doc.getString("donorName") ?: "Anonymous")
+            put("donorUid",    doc.getString("donorUid")  ?: "")
+            put("listingId",   doc.id)
+            put("description", doc.getString("description") ?: "")
+            val expiry = doc.getTimestamp("expiryDate")
+            put("expiry", if (expiry != null) {
+                SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(expiry.toDate())
+            } else "")
+        }
+
+        arr.put(obj)
+        prefs.edit().putString("cart_items", arr.toString()).apply()
+        Toast.makeText(this, "✅ Added to cart!", Toast.LENGTH_SHORT).show()
+        updateCartBadge()
+    }
+
+    // ── Firebase ──────────────────────────────────────────────────────────────
 
     private fun openPlaceOrder(doc: DocumentSnapshot) {
         val intent = Intent(this, PlaceOrderActivity::class.java).apply {
@@ -90,17 +145,10 @@ class BrowseActivity : AppCompatActivity() {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                swipeRefresh.isRefreshing = false
-                // Filter out expired listings client-side
-                val now = com.google.firebase.Timestamp.now()
-                allListings = snapshot.documents.filter { doc ->
-                    val expiry = doc.getTimestamp("expiryDate")
-                    expiry == null || expiry.compareTo(now) > 0
-                }.toMutableList()
+                allListings = snapshot.documents.toMutableList()
                 applyFilters()
             }
             .addOnFailureListener { e ->
-                swipeRefresh.isRefreshing = false
                 Toast.makeText(this, "Failed to load: ${e.message}", Toast.LENGTH_LONG).show()
                 showEmpty(true)
             }
@@ -146,6 +194,8 @@ class BrowseActivity : AppCompatActivity() {
         recyclerView.visibility = if (empty) View.GONE    else View.VISIBLE
     }
 
+    // ── Chips & Search ────────────────────────────────────────────────────────
+
     private fun setupChips() {
         val filters = listOf("All", "Veg", "Non-Veg", "Cooked", "Packed", "Fruits/Veg")
         filters.forEach { label ->
@@ -176,6 +226,8 @@ class BrowseActivity : AppCompatActivity() {
         })
     }
 
+    // ── Bottom Nav ────────────────────────────────────────────────────────────
+
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNav)
         bottomNav.selectedItemId = R.id.nav_browse
@@ -192,18 +244,22 @@ class BrowseActivity : AppCompatActivity() {
     }
 }
 
+
+// ── Adapter ───────────────────────────────────────────────────────────────────
+
 class BrowseAdapter(
     private val items: MutableList<DocumentSnapshot>,
-    private val onOrder: (DocumentSnapshot) -> Unit
+    private val onOrder:   (DocumentSnapshot) -> Unit,
+    private val onAddCart: (DocumentSnapshot) -> Unit
 ) : RecyclerView.Adapter<BrowseAdapter.ViewHolder>() {
 
     fun updateItems(newItems: List<DocumentSnapshot>) {
-        items.clear(); items.addAll(newItems)
+        items.clear()
+        items.addAll(newItems)
         notifyDataSetChanged()
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val ivFoodImage:   ImageView      = view.findViewById(R.id.ivFoodImage)
         val tvFoodName:    TextView       = view.findViewById(R.id.tvFoodName)
         val tvFoodType:    TextView       = view.findViewById(R.id.tvFoodType)
         val tvDonorName:   TextView       = view.findViewById(R.id.tvDonorName)
@@ -213,8 +269,8 @@ class BrowseAdapter(
         val tvDescription: TextView       = view.findViewById(R.id.tvDescription)
         val tvDistance:    TextView       = view.findViewById(R.id.tvDistance)
         val tvVegBadge:    TextView       = view.findViewById(R.id.tvVegBadge)
-        val tvExpiryWarn:  TextView       = view.findViewById(R.id.tvExpiryWarn)
         val btnClaim:      MaterialButton = view.findViewById(R.id.btnClaim)
+        val btnAddToCart:  MaterialButton = view.findViewById(R.id.btnAddToCart)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -224,8 +280,8 @@ class BrowseAdapter(
     override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val doc  = items[position]
-        val type = doc.getString("foodType") ?: ""
+        val doc   = items[position]
+        val type  = doc.getString("foodType") ?: ""
         val isVeg = doc.getBoolean("isVeg")
 
         holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
@@ -235,45 +291,26 @@ class BrowseAdapter(
         holder.tvQuantity.text  = doc.getString("quantity")  ?: ""
         holder.tvDistance.visibility = View.GONE
 
-        // Load food image with Glide
-        val imageUrl = doc.getString("imageUrl") ?: ""
-        if (imageUrl.isNotEmpty()) {
-            holder.ivFoodImage.visibility = View.VISIBLE
-            Glide.with(holder.itemView.context)
-                .load(imageUrl)
-                .centerCrop()
-                .placeholder(android.R.drawable.ic_menu_gallery)
-                .into(holder.ivFoodImage)
-        } else {
-            holder.ivFoodImage.visibility = View.GONE
-        }
-
-        // Veg/Non-Veg badge
+        // Veg / Non-Veg badge
         when (isVeg) {
-            true  -> { holder.tvVegBadge.text = "🟢 Veg";     holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
-            false -> { holder.tvVegBadge.text = "🔴 Non-Veg"; holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
+            true  -> {
+                holder.tvVegBadge.text = "🟢 Veg"
+                holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt())
+                holder.tvVegBadge.visibility = View.VISIBLE
+            }
+            false -> {
+                holder.tvVegBadge.text = "🔴 Non-Veg"
+                holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt())
+                holder.tvVegBadge.visibility = View.VISIBLE
+            }
             null  -> holder.tvVegBadge.visibility = View.GONE
         }
 
-        // Expiry + warning
         val expiry = doc.getTimestamp("expiryDate")
-        if (expiry != null) {
+        holder.tvExpiry.text = if (expiry != null) {
             val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
-            holder.tvExpiry.text = "⏰ ${sdf.format(expiry.toDate())}"
-
-            // Show warning if expiring within 2 hours
-            val twoHoursMs = 2 * 60 * 60 * 1000L
-            val timeLeft = expiry.toDate().time - System.currentTimeMillis()
-            if (timeLeft in 0..twoHoursMs) {
-                holder.tvExpiryWarn.visibility = View.VISIBLE
-                holder.tvExpiryWarn.text = "⚠️ Expiring soon! Claim now"
-            } else {
-                holder.tvExpiryWarn.visibility = View.GONE
-            }
-        } else {
-            holder.tvExpiry.text = "N/A"
-            holder.tvExpiryWarn.visibility = View.GONE
-        }
+            sdf.format(expiry.toDate())
+        } else "N/A"
 
         val desc = doc.getString("description")
         if (!desc.isNullOrEmpty()) {
@@ -286,5 +323,36 @@ class BrowseAdapter(
         holder.btnClaim.isEnabled = true
         holder.btnClaim.text = "Order / Claim"
         holder.btnClaim.setOnClickListener { onOrder(doc) }
+
+        // Add to Cart button
+        holder.btnAddToCart.setOnClickListener {
+            // Check if already in cart
+            val prefs = holder.itemView.context.getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+            val cartJson = prefs.getString("cart_items", "[]") ?: "[]"
+            val cartArr = JSONArray(cartJson)
+            var alreadyInCart = false
+            for (i in 0 until cartArr.length()) {
+                if (cartArr.getJSONObject(i).getString("id") == doc.id) {
+                    alreadyInCart = true
+                    break
+                }
+            }
+
+            if (alreadyInCart) {
+                holder.btnAddToCart.text = "🛒 Go to Cart"
+                holder.btnAddToCart.setBackgroundColor(0xFF2E7D32.toInt())
+                holder.btnAddToCart.setTextColor(0xFFFFFFFF.toInt())
+                holder.btnAddToCart.setOnClickListener {
+                    holder.itemView.context.startActivity(
+                        Intent(holder.itemView.context, CartActivity::class.java)
+                    )
+                }
+            } else {
+                holder.btnAddToCart.text = "🛒  Add to Cart"
+                holder.btnAddToCart.setBackgroundColor(0xFFE8F5E9.toInt())
+                holder.btnAddToCart.setTextColor(0xFF2E7D32.toInt())
+                holder.btnAddToCart.setOnClickListener { onAddCart(doc) }
+            }
+        }
     }
 }

@@ -6,4 +6,7 @@
     <item name="tvFoodLocation" type="id" />
     <item name="tvFoodExpiry" type="id" />
     <item name="tvFoodDonor" type="id" />
+    <item name="layoutCheckout" type="id" />
+    <item name="tvItemCount" type="id" />
+    <item name="btnCheckout" type="id" />
 </resources>
