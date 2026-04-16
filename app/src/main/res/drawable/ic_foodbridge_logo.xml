@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Outer circle background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,10 A50,50 0 1,1 59.9,10 Z" />
+
+    <!-- Bowl shape -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M30,55 Q30,80 60,82 Q90,80 90,55 Z" />
+
+    <!-- Bowl rim -->
+    <path
+        android:fillColor="#1B5E20"
+        android:pathData="M28,53 Q28,50 60,50 Q92,50 92,53 Q92,57 60,57 Q28,57 28,53 Z" />
+
+    <!-- Steam lines -->
+    <path
+        android:strokeColor="#2E7D32"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M45,44 Q43,38 45,32 Q47,26 45,20" />
+
+    <path
+        android:strokeColor="#2E7D32"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M60,42 Q58,36 60,30 Q62,24 60,18" />
+
+    <path
+        android:strokeColor="#2E7D32"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M75,44 Q73,38 75,32 Q77,26 75,20" />
+
+    <!-- Bridge arc over bowl -->
+    <path
+        android:strokeColor="#F57C00"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M35,53 Q60,30 85,53" />
+
+    <!-- Bridge support left -->
+    <path
+        android:strokeColor="#F57C00"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M40,53 L40,62" />
+
+    <!-- Bridge support right -->
+    <path
+        android:strokeColor="#F57C00"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M80,53 L80,62" />
+
+    <!-- Heart on bowl -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,70 L54,64 Q51,61 54,58 Q57,55 60,58 Q63,55 66,58 Q69,61 66,64 Z" />
+
+</vector>

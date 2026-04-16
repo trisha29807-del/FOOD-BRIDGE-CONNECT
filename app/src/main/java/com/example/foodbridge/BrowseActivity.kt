@@ -13,6 +13,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.bumptech.glide.Glide
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
@@ -23,6 +25,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import java.text.SimpleDateFormat
 import java.util.*
+import android.widget.ImageView
 
 class BrowseActivity : AppCompatActivity() {
 
@@ -30,6 +33,7 @@ class BrowseActivity : AppCompatActivity() {
     private lateinit var chipGroup: ChipGroup
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutEmpty: LinearLayout
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var adapter: BrowseAdapter
 
     private val db = FirebaseFirestore.getInstance()
@@ -44,10 +48,17 @@ class BrowseActivity : AppCompatActivity() {
         chipGroup    = findViewById(R.id.chipGroup)
         recyclerView = findViewById(R.id.recyclerView)
         layoutEmpty  = findViewById(R.id.layoutEmpty)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
 
         adapter = BrowseAdapter(mutableListOf()) { doc -> openPlaceOrder(doc) }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
+
+        // Pull to refresh
+        swipeRefresh.setColorSchemeColors(getColor(R.color.green_primary))
+        swipeRefresh.setOnRefreshListener {
+            loadListings()
+        }
 
         setupChips()
         setupSearch()
@@ -79,10 +90,17 @@ class BrowseActivity : AppCompatActivity() {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .get()
             .addOnSuccessListener { snapshot ->
-                allListings = snapshot.documents.toMutableList()
+                swipeRefresh.isRefreshing = false
+                // Filter out expired listings client-side
+                val now = com.google.firebase.Timestamp.now()
+                allListings = snapshot.documents.filter { doc ->
+                    val expiry = doc.getTimestamp("expiryDate")
+                    expiry == null || expiry.compareTo(now) > 0
+                }.toMutableList()
                 applyFilters()
             }
             .addOnFailureListener { e ->
+                swipeRefresh.isRefreshing = false
                 Toast.makeText(this, "Failed to load: ${e.message}", Toast.LENGTH_LONG).show()
                 showEmpty(true)
             }
@@ -93,14 +111,12 @@ class BrowseActivity : AppCompatActivity() {
 
         val filtered = allListings.filter { doc ->
             val type  = doc.getString("foodType") ?: ""
-            val isVeg = doc.getBoolean("isVeg")   // null = old listing without this field
+            val isVeg = doc.getBoolean("isVeg")
 
             val matchesFilter = when (selectedFilter) {
                 "All"        -> true
-                // Veg/Non-Veg use the saved isVeg boolean — accurate
                 "Veg"        -> isVeg == true
                 "Non-Veg"    -> isVeg == false
-                // Category filters use foodType string
                 "Cooked"     -> type.contains("Cooked",    ignoreCase = true)
                 "Fruits/Veg" -> type.contains("Fruit",     ignoreCase = true) ||
                         type.contains("Vegetable", ignoreCase = true) ||
@@ -176,19 +192,18 @@ class BrowseActivity : AppCompatActivity() {
     }
 }
 
-
 class BrowseAdapter(
     private val items: MutableList<DocumentSnapshot>,
     private val onOrder: (DocumentSnapshot) -> Unit
 ) : RecyclerView.Adapter<BrowseAdapter.ViewHolder>() {
 
     fun updateItems(newItems: List<DocumentSnapshot>) {
-        items.clear()
-        items.addAll(newItems)
+        items.clear(); items.addAll(newItems)
         notifyDataSetChanged()
     }
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val ivFoodImage:   ImageView      = view.findViewById(R.id.ivFoodImage)
         val tvFoodName:    TextView       = view.findViewById(R.id.tvFoodName)
         val tvFoodType:    TextView       = view.findViewById(R.id.tvFoodType)
         val tvDonorName:   TextView       = view.findViewById(R.id.tvDonorName)
@@ -198,6 +213,7 @@ class BrowseAdapter(
         val tvDescription: TextView       = view.findViewById(R.id.tvDescription)
         val tvDistance:    TextView       = view.findViewById(R.id.tvDistance)
         val tvVegBadge:    TextView       = view.findViewById(R.id.tvVegBadge)
+        val tvExpiryWarn:  TextView       = view.findViewById(R.id.tvExpiryWarn)
         val btnClaim:      MaterialButton = view.findViewById(R.id.btnClaim)
     }
 
@@ -219,26 +235,45 @@ class BrowseAdapter(
         holder.tvQuantity.text  = doc.getString("quantity")  ?: ""
         holder.tvDistance.visibility = View.GONE
 
-        // Veg / Non-Veg badge
+        // Load food image with Glide
+        val imageUrl = doc.getString("imageUrl") ?: ""
+        if (imageUrl.isNotEmpty()) {
+            holder.ivFoodImage.visibility = View.VISIBLE
+            Glide.with(holder.itemView.context)
+                .load(imageUrl)
+                .centerCrop()
+                .placeholder(android.R.drawable.ic_menu_gallery)
+                .into(holder.ivFoodImage)
+        } else {
+            holder.ivFoodImage.visibility = View.GONE
+        }
+
+        // Veg/Non-Veg badge
         when (isVeg) {
-            true  -> {
-                holder.tvVegBadge.text = "🟢 Veg"
-                holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt())
-                holder.tvVegBadge.visibility = View.VISIBLE
-            }
-            false -> {
-                holder.tvVegBadge.text = "🔴 Non-Veg"
-                holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt())
-                holder.tvVegBadge.visibility = View.VISIBLE
-            }
+            true  -> { holder.tvVegBadge.text = "🟢 Veg";     holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
+            false -> { holder.tvVegBadge.text = "🔴 Non-Veg"; holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
             null  -> holder.tvVegBadge.visibility = View.GONE
         }
 
+        // Expiry + warning
         val expiry = doc.getTimestamp("expiryDate")
-        holder.tvExpiry.text = if (expiry != null) {
+        if (expiry != null) {
             val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
-            sdf.format(expiry.toDate())
-        } else "N/A"
+            holder.tvExpiry.text = "⏰ ${sdf.format(expiry.toDate())}"
+
+            // Show warning if expiring within 2 hours
+            val twoHoursMs = 2 * 60 * 60 * 1000L
+            val timeLeft = expiry.toDate().time - System.currentTimeMillis()
+            if (timeLeft in 0..twoHoursMs) {
+                holder.tvExpiryWarn.visibility = View.VISIBLE
+                holder.tvExpiryWarn.text = "⚠️ Expiring soon! Claim now"
+            } else {
+                holder.tvExpiryWarn.visibility = View.GONE
+            }
+        } else {
+            holder.tvExpiry.text = "N/A"
+            holder.tvExpiryWarn.visibility = View.GONE
+        }
 
         val desc = doc.getString("description")
         if (!desc.isNullOrEmpty()) {
