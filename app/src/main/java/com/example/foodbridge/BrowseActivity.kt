@@ -1,5 +1,6 @@
 package com.example.foodbridge
 
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -7,6 +8,7 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -21,6 +23,8 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,6 +35,8 @@ class BrowseActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutEmpty: LinearLayout
     private lateinit var adapter: BrowseAdapter
+    private lateinit var tvCartCount: TextView
+    private lateinit var btnCart: FrameLayout
 
     private val db = FirebaseFirestore.getInstance()
     private var allListings = mutableListOf<DocumentSnapshot>()
@@ -44,10 +50,20 @@ class BrowseActivity : AppCompatActivity() {
         chipGroup    = findViewById(R.id.chipGroup)
         recyclerView = findViewById(R.id.recyclerView)
         layoutEmpty  = findViewById(R.id.layoutEmpty)
+        tvCartCount  = findViewById(R.id.tvCartCount)
+        btnCart      = findViewById(R.id.btnCart)
 
-        adapter = BrowseAdapter(mutableListOf()) { doc -> openPlaceOrder(doc) }
+        adapter = BrowseAdapter(
+            mutableListOf(),
+            onOrder  = { doc -> openPlaceOrder(doc) },
+            onAddCart = { doc -> addToCart(doc) }
+        )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
+
+        btnCart.setOnClickListener {
+            startActivity(Intent(this, CartActivity::class.java))
+        }
 
         setupChips()
         setupSearch()
@@ -58,7 +74,57 @@ class BrowseActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadListings()
+        updateCartBadge()
     }
+
+    // ── Cart helpers ─────────────────────────────────────────────────────────
+
+    private fun updateCartBadge() {
+        val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val count = JSONArray(prefs.getString("cart_items", "[]") ?: "[]").length()
+        if (count > 0) {
+            tvCartCount.visibility = View.VISIBLE
+            tvCartCount.text = count.toString()
+        } else {
+            tvCartCount.visibility = View.GONE
+        }
+    }
+
+    private fun addToCart(doc: DocumentSnapshot) {
+        val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val arr   = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
+
+        // Duplicate check
+        for (i in 0 until arr.length()) {
+            if (arr.getJSONObject(i).getString("id") == doc.id) {
+                Toast.makeText(this, "Already in cart!", Toast.LENGTH_SHORT).show()
+                return
+            }
+        }
+
+        val obj = JSONObject().apply {
+            put("id",          doc.id)
+            put("name",        doc.getString("foodName")  ?: "")
+            put("type",        doc.getString("foodType")  ?: "")
+            put("quantity",    doc.getString("quantity")  ?: "")
+            put("location",    doc.getString("location")  ?: "")
+            put("donor",       doc.getString("donorName") ?: "Anonymous")
+            put("donorUid",    doc.getString("donorUid")  ?: "")
+            put("listingId",   doc.id)
+            put("description", doc.getString("description") ?: "")
+            val expiry = doc.getTimestamp("expiryDate")
+            put("expiry", if (expiry != null) {
+                SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(expiry.toDate())
+            } else "")
+        }
+
+        arr.put(obj)
+        prefs.edit().putString("cart_items", arr.toString()).apply()
+        Toast.makeText(this, "✅ Added to cart!", Toast.LENGTH_SHORT).show()
+        updateCartBadge()
+    }
+
+    // ── Firebase ──────────────────────────────────────────────────────────────
 
     private fun openPlaceOrder(doc: DocumentSnapshot) {
         val intent = Intent(this, PlaceOrderActivity::class.java).apply {
@@ -93,14 +159,12 @@ class BrowseActivity : AppCompatActivity() {
 
         val filtered = allListings.filter { doc ->
             val type  = doc.getString("foodType") ?: ""
-            val isVeg = doc.getBoolean("isVeg")   // null = old listing without this field
+            val isVeg = doc.getBoolean("isVeg")
 
             val matchesFilter = when (selectedFilter) {
                 "All"        -> true
-                // Veg/Non-Veg use the saved isVeg boolean — accurate
                 "Veg"        -> isVeg == true
                 "Non-Veg"    -> isVeg == false
-                // Category filters use foodType string
                 "Cooked"     -> type.contains("Cooked",    ignoreCase = true)
                 "Fruits/Veg" -> type.contains("Fruit",     ignoreCase = true) ||
                         type.contains("Vegetable", ignoreCase = true) ||
@@ -129,6 +193,8 @@ class BrowseActivity : AppCompatActivity() {
         layoutEmpty.visibility  = if (empty) View.VISIBLE else View.GONE
         recyclerView.visibility = if (empty) View.GONE    else View.VISIBLE
     }
+
+    // ── Chips & Search ────────────────────────────────────────────────────────
 
     private fun setupChips() {
         val filters = listOf("All", "Veg", "Non-Veg", "Cooked", "Packed", "Fruits/Veg")
@@ -160,6 +226,8 @@ class BrowseActivity : AppCompatActivity() {
         })
     }
 
+    // ── Bottom Nav ────────────────────────────────────────────────────────────
+
     private fun setupBottomNav() {
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNav)
         bottomNav.selectedItemId = R.id.nav_browse
@@ -177,9 +245,12 @@ class BrowseActivity : AppCompatActivity() {
 }
 
 
+// ── Adapter ───────────────────────────────────────────────────────────────────
+
 class BrowseAdapter(
     private val items: MutableList<DocumentSnapshot>,
-    private val onOrder: (DocumentSnapshot) -> Unit
+    private val onOrder:   (DocumentSnapshot) -> Unit,
+    private val onAddCart: (DocumentSnapshot) -> Unit
 ) : RecyclerView.Adapter<BrowseAdapter.ViewHolder>() {
 
     fun updateItems(newItems: List<DocumentSnapshot>) {
@@ -199,6 +270,7 @@ class BrowseAdapter(
         val tvDistance:    TextView       = view.findViewById(R.id.tvDistance)
         val tvVegBadge:    TextView       = view.findViewById(R.id.tvVegBadge)
         val btnClaim:      MaterialButton = view.findViewById(R.id.btnClaim)
+        val btnAddToCart:  MaterialButton = view.findViewById(R.id.btnAddToCart)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -208,8 +280,8 @@ class BrowseAdapter(
     override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val doc  = items[position]
-        val type = doc.getString("foodType") ?: ""
+        val doc   = items[position]
+        val type  = doc.getString("foodType") ?: ""
         val isVeg = doc.getBoolean("isVeg")
 
         holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
@@ -251,5 +323,36 @@ class BrowseAdapter(
         holder.btnClaim.isEnabled = true
         holder.btnClaim.text = "Order / Claim"
         holder.btnClaim.setOnClickListener { onOrder(doc) }
+
+        // Add to Cart button
+        holder.btnAddToCart.setOnClickListener {
+            // Check if already in cart
+            val prefs = holder.itemView.context.getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+            val cartJson = prefs.getString("cart_items", "[]") ?: "[]"
+            val cartArr = JSONArray(cartJson)
+            var alreadyInCart = false
+            for (i in 0 until cartArr.length()) {
+                if (cartArr.getJSONObject(i).getString("id") == doc.id) {
+                    alreadyInCart = true
+                    break
+                }
+            }
+
+            if (alreadyInCart) {
+                holder.btnAddToCart.text = "🛒 Go to Cart"
+                holder.btnAddToCart.setBackgroundColor(0xFF2E7D32.toInt())
+                holder.btnAddToCart.setTextColor(0xFFFFFFFF.toInt())
+                holder.btnAddToCart.setOnClickListener {
+                    holder.itemView.context.startActivity(
+                        Intent(holder.itemView.context, CartActivity::class.java)
+                    )
+                }
+            } else {
+                holder.btnAddToCart.text = "🛒  Add to Cart"
+                holder.btnAddToCart.setBackgroundColor(0xFFE8F5E9.toInt())
+                holder.btnAddToCart.setTextColor(0xFF2E7D32.toInt())
+                holder.btnAddToCart.setOnClickListener { onAddCart(doc) }
+            }
+        }
     }
 }
