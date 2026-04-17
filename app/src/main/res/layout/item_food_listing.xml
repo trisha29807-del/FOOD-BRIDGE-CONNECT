@@ -16,7 +16,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Food image (Glide loads here) -->
+        <!-- Food image -->
         <ImageView
             android:id="@+id/ivFoodImage"
             android:layout_width="match_parent"
@@ -45,7 +45,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Header: name + veg badge + distance + type -->
+            <!-- Header row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -155,7 +155,7 @@
                 android:layout_marginBottom="10dp"
                 android:visibility="gone" />
 
-            <!-- Order / Claim button -->
+            <!-- Order / Claim -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnClaim"
                 android:layout_width="match_parent"
@@ -168,7 +168,7 @@
                 app:cornerRadius="10dp"
                 android:stateListAnimator="@null" />
 
-            <!-- Add to Cart button -->
+            <!-- Add to Cart -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddToCart"
                 android:layout_width="match_parent"
@@ -181,7 +181,22 @@
                 app:backgroundTint="#E8F5E9"
                 app:strokeColor="#2E7D32"
                 app:strokeWidth="1dp"
-                app:cornerRadius="12dp"
+                app:cornerRadius="10dp"
+                android:stateListAnimator="@null" />
+
+            <!-- Chat with Donor -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnChat"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="💬  Chat with Donor"
+                android:textSize="14sp"
+                android:textColor="#1565C0"
+                app:backgroundTint="#E3F2FD"
+                app:strokeColor="#1565C0"
+                app:strokeWidth="1dp"
+                app:cornerRadius="10dp"
                 android:stateListAnimator="@null" />
 
         </LinearLayout>

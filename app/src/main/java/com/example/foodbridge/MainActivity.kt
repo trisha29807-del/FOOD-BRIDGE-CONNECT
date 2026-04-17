@@ -4,9 +4,9 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.widget.NestedScrollView
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,10 +20,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(R.layout.activity_main)
-
-        findViewById<NestedScrollView>(R.id.nestedScrollView)
-            .isNestedScrollingEnabled = true
-
         setupButtons()
         setupHowItWorks()
         setupBottomNav()
@@ -42,10 +38,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.cardNearbyFood).setOnClickListener {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
-        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fabCart)
-            .setOnClickListener {
-                startActivity(Intent(this, TrackOrdersActivity::class.java))
-            }
+
+        // FAB cart → opens CartActivity (NOT TrackOrdersActivity)
+        findViewById<FloatingActionButton>(R.id.fabCart).setOnClickListener {
+            startActivity(Intent(this, CartActivity::class.java))
+        }
     }
 
     private fun setupHowItWorks() {
@@ -60,12 +57,14 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("Pickup & Delivery")
                 .setMessage(
                     "Once you claim a food listing:\n\n" +
-                            "1. Contact the donor using their listed location\n\n" +
-                            "2. Coordinate a pickup time directly\n\n" +
-                            "3. Track your active orders in your Profile → My Orders\n\n" +
-                            "4. Mark as received once you collect the food"
+                            "1. Contact the donor via chat\n\n" +
+                            "2. Coordinate a pickup time\n\n" +
+                            "3. Track your orders in Profile → My Orders\n\n" +
+                            "4. Mark as received once collected"
                 )
-                .setPositiveButton("OK", null)
+                .setPositiveButton("Track My Orders") { _, _ ->
+                    startActivity(Intent(this, TrackOrdersActivity::class.java))
+                }
                 .setNegativeButton("Close", null)
                 .show()
         }
