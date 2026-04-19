@@ -1,7 +1,24 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.MyApplication" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Main app theme -->
+    <style name="Theme.FoodBridge" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#2E7D32</item>
+        <item name="colorPrimaryVariant">#1B5E20</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="android:windowBackground">#F5F5EE</item>
+        <item name="android:statusBarColor">#F5F5EE</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <!-- Splash screen theme — green background, no action bar -->
+    <style name="Theme.FoodBridge.Splash" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">#2E7D32</item>
+        <item name="android:statusBarColor">#2E7D32</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">#2E7D32</item>
+        <item name="colorPrimaryVariant">#1B5E20</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+    </style>
+
 </resources>
