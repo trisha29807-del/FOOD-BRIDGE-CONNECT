@@ -271,6 +271,8 @@ class BrowseAdapter(
         val tvExpiryWarn:  TextView       = view.findViewById(R.id.tvExpiryWarn)
         val tvFoodName:    TextView       = view.findViewById(R.id.tvFoodName)
         val tvFoodType:    TextView       = view.findViewById(R.id.tvFoodType)
+        val tvPrice:       TextView       = view.findViewById(R.id.tvPrice)
+        val tvListingType: TextView       = view.findViewById(R.id.tvListingType)
         val tvDonorName:   TextView       = view.findViewById(R.id.tvDonorName)
         val tvLocation:    TextView       = view.findViewById(R.id.tvLocation)
         val tvQuantity:    TextView       = view.findViewById(R.id.tvQuantity)
@@ -333,6 +335,12 @@ class BrowseAdapter(
         val desc = doc.getString("description")
         if (!desc.isNullOrEmpty()) { holder.tvDescription.text = desc; holder.tvDescription.visibility = View.VISIBLE }
         else holder.tvDescription.visibility = View.GONE
+
+        // Price
+        val price = doc.getDouble("price") ?: 0.0
+        val listingType = doc.getString("listingType") ?: "Free Donation"
+        holder.tvPrice.text = if (price == 0.0) "🆓 Free" else "₹${String.format("%.0f", price)}"
+        holder.tvListingType.text = listingType
 
         // Order button
         holder.btnClaim.text = "Order / Claim"

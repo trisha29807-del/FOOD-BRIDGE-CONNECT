@@ -24,6 +24,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:layout_marginBottom="16dp">
+
                 <ImageButton
                     android:id="@+id/btnBack"
                     android:layout_width="40dp"
@@ -31,6 +32,7 @@
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Back" />
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -40,6 +42,7 @@
                     android:textStyle="bold"
                     android:textColor="#222222"
                     android:layout_marginStart="8dp" />
+
                 <ProgressBar
                     android:id="@+id/progressBar"
                     android:layout_width="24dp"
@@ -135,16 +138,17 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Delivery Details"
+                        android:text="📍 Delivery Details"
                         android:textSize="15sp"
                         android:textStyle="bold"
                         android:textColor="#222222"
                         android:layout_marginBottom="12dp" />
 
+                    <!-- Delivery Address -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Delivery Address"
+                        android:text="Delivery Address *"
                         android:textSize="13sp"
                         android:textColor="#555555"
                         android:layout_marginBottom="6dp" />
@@ -171,10 +175,11 @@
                             android:textColor="#333333" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Contact Number -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Contact Number"
+                        android:text="Contact Number *"
                         android:textSize="13sp"
                         android:textColor="#555555"
                         android:layout_marginBottom="6dp" />
@@ -200,6 +205,7 @@
                             android:textColor="#333333" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Special Instructions -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -222,7 +228,7 @@
                             android:id="@+id/etNotes"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="Any special requests..."
+                            android:hint="Any special requests or instructions..."
                             android:textSize="14sp"
                             android:textColor="#333333" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -247,7 +253,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Payment Method"
+                        android:text="💳 Payment Method"
                         android:textSize="15sp"
                         android:textStyle="bold"
                         android:textColor="#222222"
@@ -259,7 +265,6 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <!-- COD -->
                         <RadioButton
                             android:id="@+id/rbCod"
                             android:layout_width="match_parent"
@@ -270,7 +275,6 @@
                             android:checked="true"
                             android:buttonTint="#2E7D32" />
 
-                        <!-- UPI -->
                         <RadioButton
                             android:id="@+id/rbUpi"
                             android:layout_width="match_parent"
@@ -280,7 +284,6 @@
                             android:textColor="#222222"
                             android:buttonTint="#2E7D32" />
 
-                        <!-- UPI input (shown when UPI is selected) -->
                         <LinearLayout
                             android:id="@+id/layoutUpi"
                             android:layout_width="match_parent"
@@ -289,7 +292,6 @@
                             android:layout_marginStart="8dp"
                             android:layout_marginBottom="8dp"
                             android:visibility="gone">
-
                             <com.google.android.material.textfield.TextInputLayout
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
@@ -305,13 +307,11 @@
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:hint="Enter UPI ID (e.g. name@upi)"
-                                    android:inputType="text"
                                     android:textSize="14sp"
                                     android:textColor="#333333" />
                             </com.google.android.material.textfield.TextInputLayout>
                         </LinearLayout>
 
-                        <!-- Card -->
                         <RadioButton
                             android:id="@+id/rbCard"
                             android:layout_width="match_parent"
@@ -321,7 +321,6 @@
                             android:textColor="#222222"
                             android:buttonTint="#2E7D32" />
 
-                        <!-- Card inputs (shown when Card is selected) -->
                         <LinearLayout
                             android:id="@+id/layoutCard"
                             android:layout_width="match_parent"

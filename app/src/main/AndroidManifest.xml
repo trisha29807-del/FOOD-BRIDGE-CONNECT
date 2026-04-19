@@ -100,6 +100,7 @@
         <activity android:name=".CartActivity" android:exported="false" />
         <activity android:name=".PlaceOrderActivity" android:exported="false"
             tools:ignore="DuplicateActivity" />
+        <activity android:name="com.example.foodbridge.ChatActivity" android:exported="false" />
 
 
     </application>

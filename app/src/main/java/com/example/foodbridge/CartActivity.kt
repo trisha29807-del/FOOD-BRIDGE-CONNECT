@@ -1,5 +1,6 @@
 package com.example.foodbridge
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -7,11 +8,36 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
+
+// ── Cart item data class (replaces old FoodItem) ─────────────────────────────
+data class CartItem(
+    val id: String,          // Firestore document ID (String, not Long)
+    val name: String,
+    val type: String,
+    val quantity: String,
+    val location: String,
+    val expiry: String,
+    val description: String,
+    val donor: String,
+    val donorUid: String,
+    val price: Double,
+    val listingType: String
+)
 
 class CartActivity : AppCompatActivity() {
 
@@ -19,24 +45,30 @@ class CartActivity : AppCompatActivity() {
     private lateinit var layoutEmpty: LinearLayout
     private lateinit var layoutCheckout: LinearLayout
     private lateinit var tvItemCount: TextView
+    private lateinit var tvTotalPrice: TextView
     private lateinit var btnCheckout: MaterialButton
+    private val db = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_cart)
 
-        recyclerView    = findViewById(R.id.recyclerView)
-        layoutEmpty     = findViewById(R.id.layoutEmpty)
-        layoutCheckout  = findViewById(R.id.layoutCheckout)
-        tvItemCount     = findViewById(R.id.tvItemCount)
-        btnCheckout     = findViewById(R.id.btnCheckout)
+        recyclerView   = findViewById(R.id.recyclerView)
+        layoutEmpty    = findViewById(R.id.layoutEmpty)
+        layoutCheckout = findViewById(R.id.layoutCheckout)
+        tvItemCount    = findViewById(R.id.tvItemCount)
+        tvTotalPrice   = findViewById(R.id.tvTotalPrice)
+        btnCheckout    = findViewById(R.id.btnCheckout)
 
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
-
         recyclerView.layoutManager = LinearLayoutManager(this)
+        btnCheckout.setOnClickListener { placeAllOrders() }
 
-        btnCheckout.setOnClickListener { placeOrder() }
+        loadCart()
+    }
 
+    override fun onResume() {
+        super.onResume()
         loadCart()
     }
 
@@ -45,18 +77,21 @@ class CartActivity : AppCompatActivity() {
         val json  = prefs.getString("cart_items", "[]") ?: "[]"
         val arr   = JSONArray(json)
 
-        val items = mutableListOf<FoodItem>()
+        val items = mutableListOf<CartItem>()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            items.add(FoodItem(
-                id          = obj.getLong("id"),
-                name        = obj.getString("name"),
-                type        = obj.getString("type"),
-                quantity    = obj.getString("quantity"),
-                location    = obj.getString("location"),
+            items.add(CartItem(
+                id          = obj.getString("id"),
+                name        = obj.optString("name", ""),
+                type        = obj.optString("type", ""),
+                quantity    = obj.optString("quantity", ""),
+                location    = obj.optString("location", ""),
                 expiry      = obj.optString("expiry", ""),
                 description = obj.optString("description", ""),
-                donor       = obj.optString("donor", "Anonymous")
+                donor       = obj.optString("donor", "Anonymous"),
+                donorUid    = obj.optString("donorUid", ""),
+                price       = obj.optDouble("price", 0.0),
+                listingType = obj.optString("listingType", "Free Donation")
             ))
         }
 
@@ -69,94 +104,117 @@ class CartActivity : AppCompatActivity() {
             layoutEmpty.visibility    = View.GONE
             layoutCheckout.visibility = View.VISIBLE
             tvItemCount.text          = "${items.size} item(s) in cart"
-            recyclerView.adapter      = CartAdapter(items) { item ->
+
+            // Show total price
+            val total = items.sumOf { it.price }
+            tvTotalPrice.text = if (total == 0.0) "Total: Free 🎁" else "Total: ₹${String.format("%.0f", total)}"
+
+            recyclerView.adapter = CartAdapter(items) { item ->
                 removeFromCart(item.id)
             }
         }
     }
 
-    private fun removeFromCart(id: Long) {
-        val prefs    = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
-        val json     = prefs.getString("cart_items", "[]") ?: "[]"
-        val arr      = JSONArray(json)
-        val newArr   = JSONArray()
+    private fun removeFromCart(id: String) {
+        val prefs  = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val arr    = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
+        val newArr = JSONArray()
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
-            if (obj.getLong("id") != id) newArr.put(obj)
+            if (obj.getString("id") != id) newArr.put(obj)
         }
         prefs.edit().putString("cart_items", newArr.toString()).apply()
-        android.widget.Toast.makeText(this, "Removed from cart", android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Removed from cart", Toast.LENGTH_SHORT).show()
         loadCart()
     }
 
-    private fun placeOrder() {
-        val prefs      = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
-        val cartJson   = prefs.getString("cart_items", "[]") ?: "[]"
-        val cartArr    = JSONArray(cartJson)
-
-        // Move cart items to my_orders
-        val ordersJson = prefs.getString("my_orders", "[]") ?: "[]"
-        val ordersArr  = JSONArray(ordersJson)
-
-        for (i in 0 until cartArr.length()) {
-            val obj = cartArr.getJSONObject(i)
-            obj.put("timestamp", System.currentTimeMillis())
-            ordersArr.put(obj)
+    private fun placeAllOrders() {
+        val uid = FirebaseHelper.currentUid ?: run {
+            Toast.makeText(this, "Please sign in again", Toast.LENGTH_SHORT).show()
+            return
         }
+        val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
+        val arr   = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
+        if (arr.length() == 0) return
 
-        // Also remove ordered items from food_listings
-        val listingsJson = prefs.getString("food_listings", "[]") ?: "[]"
-        val listingsArr  = JSONArray(listingsJson)
-        val newListings  = JSONArray()
-        val cartIds      = (0 until cartArr.length()).map { cartArr.getJSONObject(it).getLong("id") }
+        btnCheckout.isEnabled = false
+        btnCheckout.text = "Placing orders..."
 
-        for (i in 0 until listingsArr.length()) {
-            val obj = listingsArr.getJSONObject(i)
-            if (!cartIds.contains(obj.getLong("id"))) newListings.put(obj)
+        CoroutineScope(Dispatchers.Main).launch {
+            var successCount = 0
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val listingId = obj.getString("id")
+                try {
+                    // Mark listing as claimed
+                    db.collection("food_listings").document(listingId)
+                        .update(mapOf(
+                            "status"       to "claimed",
+                            "claimedByUid" to uid,
+                            "claimedAt"    to Timestamp.now()
+                        )).await()
+
+                    // Save to orders collection
+                    db.collection("orders").add(mapOf(
+                        "listingId"      to listingId,
+                        "buyerUid"       to uid,
+                        "donorUid"       to obj.optString("donorUid", ""),
+                        "donorName"      to obj.optString("donor", ""),
+                        "foodName"       to obj.optString("name", ""),
+                        "foodType"       to obj.optString("type", ""),
+                        "quantity"       to obj.optString("quantity", ""),
+                        "pickupLocation" to obj.optString("location", ""),
+                        "price"          to obj.optDouble("price", 0.0),
+                        "listingType"    to obj.optString("listingType", "Free Donation"),
+                        "paymentMethod"  to "Cash on Delivery",
+                        "paymentStatus"  to "pending",
+                        "orderStatus"    to "confirmed",
+                        "createdAt"      to Timestamp.now()
+                    )).await()
+
+                    successCount++
+                } catch (e: Exception) { /* skip failed items */ }
+            }
+
+            // Clear cart
+            prefs.edit().putString("cart_items", "[]").apply()
+            btnCheckout.isEnabled = true
+            btnCheckout.text = "Checkout"
+
+            Toast.makeText(
+                this@CartActivity,
+                "🎉 $successCount order(s) placed successfully!",
+                Toast.LENGTH_LONG
+            ).show()
+
+            // Go to track orders
+            startActivity(Intent(this@CartActivity, TrackOrdersActivity::class.java))
+            finish()
         }
-
-        prefs.edit()
-            .putString("my_orders", ordersArr.toString())
-            .putString("cart_items", "[]")
-            .putString("food_listings", newListings.toString())
-            .apply()
-
-        android.widget.Toast.makeText(this, "🎉 Order placed successfully!", android.widget.Toast.LENGTH_LONG).show()
-        loadCart()
     }
 }
 
-annotation class FoodItem(
-    val id: Long,
-    val name: String,
-    val type: String,
-    val quantity: String,
-    val location: String,
-    val expiry: String,
-    val description: String,
-    val donor: String
-)
-
 class CartAdapter(
-    private val items: List<FoodItem>,
-    private val onRemove: (FoodItem) -> Unit
+    private val items: List<CartItem>,
+    private val onRemove: (CartItem) -> Unit
 ) : RecyclerView.Adapter<CartAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val tvEmoji:    TextView = view.findViewById(R.id.tvFoodEmoji)
-        val tvName:     TextView = view.findViewById(R.id.tvFoodName)
-        val tvType:     TextView = view.findViewById(R.id.tvFoodType)
-        val tvQuantity: TextView = view.findViewById(R.id.tvFoodQuantity)
-        val tvLocation: TextView = view.findViewById(R.id.tvFoodLocation)
-        val tvDonor:    TextView = view.findViewById(R.id.tvFoodDonor)
-        val btnRemove:  TextView = view.findViewById(R.id.btnRemove)
+        val tvEmoji:       TextView = view.findViewById(R.id.tvFoodEmoji)
+        val tvName:        TextView = view.findViewById(R.id.tvFoodName)
+        val tvType:        TextView = view.findViewById(R.id.tvFoodType)
+        val tvQuantity:    TextView = view.findViewById(R.id.tvFoodQuantity)
+        val tvLocation:    TextView = view.findViewById(R.id.tvFoodLocation)
+        val tvDonor:       TextView = view.findViewById(R.id.tvFoodDonor)
+        val tvPrice:       TextView = view.findViewById(R.id.tvCartItemPrice)
+        val btnRemove:     TextView = view.findViewById(R.id.btnRemove)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_cart_card, parent, false)
-        return ViewHolder(view)
-    }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+        ViewHolder(LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_cart_card, parent, false))
+
+    override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
@@ -166,10 +224,9 @@ class CartAdapter(
         holder.tvQuantity.text = "📦 ${item.quantity}"
         holder.tvLocation.text = "📍 ${item.location}"
         holder.tvDonor.text    = "👤 ${item.donor}"
+        holder.tvPrice.text    = if (item.price == 0.0) "🆓 Free" else "₹${String.format("%.0f", item.price)}"
         holder.btnRemove.setOnClickListener { onRemove(item) }
     }
-
-    override fun getItemCount() = items.size
 
     private fun getFoodEmoji(type: String): String = when {
         type.contains("Cooked",    ignoreCase = true) -> "🍱"

@@ -34,7 +34,9 @@ class DonateFoodActivity : AppCompatActivity() {
     private lateinit var etLocation: TextInputEditText
     private lateinit var etExpiry: TextInputEditText
     private lateinit var etDescription: TextInputEditText
+    private lateinit var etPrice: TextInputEditText
     private lateinit var spinnerFoodType: Spinner
+    private lateinit var spinnerListingType: Spinner
     private lateinit var btnListFood: MaterialButton
     private lateinit var btnAddPhoto: LinearLayout
     private lateinit var ivFoodPhoto: ImageView
@@ -53,14 +55,15 @@ class DonateFoodActivity : AppCompatActivity() {
         if (uri != null) { selectedImageUri = uri; showImagePreview(uri) }
     }
     private val cameraPermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) openCamera() else Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
+        if (granted) openCamera()
+        else Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_donate_food)
         bindViews()
-        setupFoodTypeSpinner()
+        setupSpinners()
         setupExpiryPicker()
         setupPhotoButton()
         setupSubmit()
@@ -69,23 +72,31 @@ class DonateFoodActivity : AppCompatActivity() {
     }
 
     private fun bindViews() {
-        etFoodName      = findViewById(R.id.etFoodName)
-        etQuantity      = findViewById(R.id.etQuantity)
-        etLocation      = findViewById(R.id.etLocation)
-        etExpiry        = findViewById(R.id.etExpiry)
-        etDescription   = findViewById(R.id.etDescription)
-        spinnerFoodType = findViewById(R.id.spinnerFoodType)
-        btnListFood     = findViewById(R.id.btnListFood)
-        btnAddPhoto     = findViewById(R.id.btnAddPhoto)
-        ivFoodPhoto     = findViewById(R.id.ivFoodPhoto)
-        rgVegType       = findViewById(R.id.rgVegType)
-        rbVeg           = findViewById(R.id.rbVeg)
-        rbNonVeg        = findViewById(R.id.rbNonVeg)
+        etFoodName         = findViewById(R.id.etFoodName)
+        etQuantity         = findViewById(R.id.etQuantity)
+        etLocation         = findViewById(R.id.etLocation)
+        etExpiry           = findViewById(R.id.etExpiry)
+        etDescription      = findViewById(R.id.etDescription)
+        etPrice            = findViewById(R.id.etPrice)
+        spinnerFoodType    = findViewById(R.id.spinnerFoodType)
+        spinnerListingType = findViewById(R.id.spinnerListingType)
+        btnListFood        = findViewById(R.id.btnListFood)
+        btnAddPhoto        = findViewById(R.id.btnAddPhoto)
+        ivFoodPhoto        = findViewById(R.id.ivFoodPhoto)
+        rgVegType          = findViewById(R.id.rgVegType)
+        rbVeg              = findViewById(R.id.rbVeg)
+        rbNonVeg           = findViewById(R.id.rbNonVeg)
     }
 
-    private fun setupFoodTypeSpinner() {
+    private fun setupSpinners() {
+        // Food type spinner
         val types = listOf("Cooked Food","Raw Vegetables","Fruits","Grains","Dairy","Bakery","Beverages","Other")
         spinnerFoodType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, types).also {
+            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        // Listing type spinner
+        val listingTypes = listOf("Free Donation", "Sell at Price", "Pay What You Can")
+        spinnerListingType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, listingTypes).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
     }
@@ -141,23 +152,30 @@ class DonateFoodActivity : AppCompatActivity() {
             val location    = etLocation.text.toString().trim()
             val description = etDescription.text.toString().trim()
             val foodType    = spinnerFoodType.selectedItem.toString()
+            val listingType = spinnerListingType.selectedItem.toString()
             val isVeg       = rgVegType.checkedRadioButtonId == R.id.rbVeg
+            val priceStr    = etPrice.text.toString().trim()
+            val price       = priceStr.toDoubleOrNull() ?: 0.0
 
             var isValid = true
-            if (foodName.isEmpty()) { etFoodName.error = "Required"; isValid = false } else { etFoodName.error = null }
-            if (quantity.isEmpty()) { etQuantity.error = "Required"; isValid = false } else { etQuantity.error = null }
-            if (location.isEmpty()) { etLocation.error = "Required"; isValid = false } else { etLocation.error = null }
+            if (foodName.isEmpty()) { etFoodName.error = "Required"; isValid = false } else etFoodName.error = null
+            if (quantity.isEmpty()) { etQuantity.error = "Required"; isValid = false } else etQuantity.error = null
+            if (location.isEmpty()) { etLocation.error = "Required"; isValid = false } else etLocation.error = null
             if (selectedExpiryMillis == 0L) { Toast.makeText(this, "Select expiry date", Toast.LENGTH_SHORT).show(); isValid = false }
             if (!isValid) return@setOnClickListener
 
-            // Show FSSAI compliance checklist before posting
+            // Show FSSAI compliance checklist
             FssaiComplianceDialog.show(this) {
-                postListing(foodName, foodType, isVeg, quantity, location, description)
+                postListing(foodName, foodType, listingType, isVeg, quantity, location, description, price)
             }
         }
     }
 
-    private fun postListing(foodName: String, foodType: String, isVeg: Boolean, quantity: String, location: String, description: String) {
+    private fun postListing(
+        foodName: String, foodType: String, listingType: String,
+        isVeg: Boolean, quantity: String, location: String,
+        description: String, price: Double
+    ) {
         val uid = FirebaseHelper.currentUid ?: return
         btnListFood.isEnabled = false
         btnListFood.text = "Posting..."
@@ -171,6 +189,8 @@ class DonateFoodActivity : AppCompatActivity() {
                 "donorName"   to donorName,
                 "foodName"    to foodName,
                 "foodType"    to foodType,
+                "listingType" to listingType,
+                "price"       to price,
                 "isVeg"       to isVeg,
                 "quantity"    to quantity,
                 "location"    to location,
@@ -187,12 +207,13 @@ class DonateFoodActivity : AppCompatActivity() {
 
             result.fold(
                 onSuccess = {
-                    // Notify users about new listing
                     NotificationHelper.notifyNewListing(foodName, location)
                     Toast.makeText(this@DonateFoodActivity, "Food listed successfully!", Toast.LENGTH_SHORT).show()
                     finish()
                 },
-                onFailure = { Toast.makeText(this@DonateFoodActivity, "Failed to post. Try again.", Toast.LENGTH_SHORT).show() }
+                onFailure = {
+                    Toast.makeText(this@DonateFoodActivity, "Failed to post. Try again.", Toast.LENGTH_SHORT).show()
+                }
             )
         }
     }

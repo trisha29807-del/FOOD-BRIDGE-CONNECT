@@ -234,6 +234,78 @@
                         </LinearLayout>
                     </LinearLayout>
 
+                    <!-- Add this AFTER the Quantity field and BEFORE the Expiry + Location row in activity_donate_food.xml -->
+
+                    <!-- Price Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:weightSum="2"
+                        android:layout_marginBottom="16dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginEnd="8dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Price (₹)"
+                                android:textSize="13sp"
+                                android:textColor="#555555"
+                                android:layout_marginBottom="6dp" />
+
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                app:boxBackgroundMode="filled"
+                                app:boxBackgroundColor="#F5F5EE"
+                                app:boxCornerRadiusTopStart="10dp"
+                                app:boxCornerRadiusTopEnd="10dp"
+                                app:boxCornerRadiusBottomStart="10dp"
+                                app:boxCornerRadiusBottomEnd="10dp"
+                                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox">
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/etPrice"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:hint="0 = Free"
+                                    android:inputType="numberDecimal"
+                                    android:textSize="14sp"
+                                    android:textColor="#333333" />
+                            </com.google.android.material.textfield.TextInputLayout>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="8dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Listing Type"
+                                android:textSize="13sp"
+                                android:textColor="#555555"
+                                android:layout_marginBottom="6dp" />
+
+                            <Spinner
+                                android:id="@+id/spinnerListingType"
+                                android:layout_width="match_parent"
+                                android:layout_height="52dp"
+                                android:background="@drawable/spinner_bg"
+                                android:paddingStart="12dp"
+                                android:paddingEnd="12dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+
                     <!-- Expiry + Location Row -->
                     <LinearLayout
                         android:layout_width="match_parent"
