@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MyApplication" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <style name="Theme.FoodBridge" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">#2E7D32</item>
         <item name="colorPrimaryVariant">#1B5E20</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="android:windowBackground">#F5F5EE</item>
-        <item name="android:statusBarColor">#F5F5EE</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#2E7D32</item>
+    </style>
+
+    <style name="Theme.FoodBridge.Splash" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">#2E7D32</item>
+        <item name="android:statusBarColor">#2E7D32</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorPrimary">#2E7D32</item>
+        <item name="colorPrimaryVariant">#1B5E20</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
     </style>
 </resources>
