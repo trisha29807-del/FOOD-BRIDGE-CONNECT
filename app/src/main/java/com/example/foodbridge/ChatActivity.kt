@@ -9,11 +9,14 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.launch
 
 class ChatActivity : AppCompatActivity() {
 
@@ -21,12 +24,14 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var etMessage: EditText
     private lateinit var btnSend: ImageButton
     private lateinit var tvChatTitle: TextView
+    private lateinit var tvOnlineStatus: TextView
 
     private val db = FirebaseFirestore.getInstance()
     private var chatId = ""
     private var otherUserName = ""
     private val messages = mutableListOf<ChatMessage>()
     private lateinit var adapter: ChatAdapter
+    private var messageListener: ListenerRegistration? = null
 
     data class ChatMessage(
         val text: String,
@@ -40,14 +45,17 @@ class ChatActivity : AppCompatActivity() {
         setContentView(R.layout.activity_chat)
 
         chatId        = intent.getStringExtra("chatId")    ?: ""
-        otherUserName = intent.getStringExtra("otherName") ?: "Donor"
+        otherUserName = intent.getStringExtra("otherName") ?: "User"
 
-        recyclerView = findViewById(R.id.recyclerView)
-        etMessage    = findViewById(R.id.etMessage)
-        btnSend      = findViewById(R.id.btnSend)
-        tvChatTitle  = findViewById(R.id.tvChatTitle)
+        recyclerView    = findViewById(R.id.recyclerView)
+        etMessage       = findViewById(R.id.etMessage)
+        btnSend         = findViewById(R.id.btnSend)
+        tvChatTitle     = findViewById(R.id.tvChatTitle)
+        tvOnlineStatus  = findViewById(R.id.tvOnlineStatus)
 
-        tvChatTitle.text = "💬 $otherUserName"
+        tvChatTitle.text    = otherUserName
+        tvOnlineStatus.text = "FoodBridge Chat"
+
         findViewById<View>(R.id.btnBack).setOnClickListener { finish() }
 
         if (chatId.isEmpty()) {
@@ -63,16 +71,57 @@ class ChatActivity : AppCompatActivity() {
         adapter = ChatAdapter(messages, FirebaseHelper.currentUid ?: "")
         recyclerView.adapter = adapter
 
-        // Create chat document if it doesn't exist yet
-        db.collection("chats").document(chatId)
-            .set(mapOf("createdAt" to Timestamp.now()), com.google.firebase.firestore.SetOptions.merge())
-
-        listenForMessages()
+        // Initialize chat document with participant info
+        initChatDocument()
         setupSend()
     }
 
-    private fun listenForMessages() {
+    override fun onStart() {
+        super.onStart()
+        // Start real-time listener when activity is visible
+        startListening()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Remove listener when activity goes to background to save reads
+        messageListener?.remove()
+    }
+
+    private fun initChatDocument() {
+        val myUid = FirebaseHelper.currentUid ?: return
+        // Extract other UID from chatId (format: uid1_uid2)
+        val uids = chatId.split("_")
+        val otherUid = uids.firstOrNull { it != myUid } ?: return
+
+        // Save participant info so ChatListActivity can show names
         db.collection("chats").document(chatId)
+            .get()
+            .addOnSuccessListener { doc ->
+                if (!doc.exists()) {
+                    // Create chat document with participants list
+                    db.collection("chats").document(chatId).set(mapOf(
+                        "participants"     to listOf(myUid, otherUid),
+                        "participantNames" to mapOf(myUid to "Me"),
+                        "lastMessage"      to "",
+                        "lastUpdated"      to Timestamp.now(),
+                        "createdAt"        to Timestamp.now()
+                    ))
+                }
+                // Update my name in the chat
+                lifecycleScope.launch {
+                    val result = FirebaseHelper.getUserProfile(myUid)
+                    val name = result.getOrNull()?.get("name") as? String ?: "User"
+                    db.collection("chats").document(chatId)
+                        .update("participantNames.$myUid", name)
+                }
+            }
+    }
+
+    private fun startListening() {
+        if (chatId.isEmpty()) return
+
+        messageListener = db.collection("chats").document(chatId)
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
@@ -90,17 +139,17 @@ class ChatActivity : AppCompatActivity() {
                     ))
                 }
                 adapter.notifyDataSetChanged()
+                // Auto scroll to latest message
                 if (messages.isNotEmpty()) {
-                    recyclerView.scrollToPosition(messages.size - 1)
+                    recyclerView.post {
+                        recyclerView.scrollToPosition(messages.size - 1)
+                    }
                 }
             }
     }
 
     private fun setupSend() {
         btnSend.setOnClickListener { sendMessage() }
-        etMessage.setOnEditorActionListener { _, _, _ ->
-            sendMessage(); true
-        }
     }
 
     private fun sendMessage() {
@@ -120,11 +169,16 @@ class ChatActivity : AppCompatActivity() {
             "timestamp" to Timestamp.now()
         )
 
+        // Add message to subcollection
         db.collection("chats").document(chatId)
             .collection("messages")
             .add(message)
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
+                etMessage.setText(text) // restore text on failure
+            }
 
-        // Update last message on chat document
+        // Update last message on chat document for ChatListActivity
         db.collection("chats").document(chatId)
             .update(mapOf(
                 "lastMessage" to text,
@@ -132,6 +186,8 @@ class ChatActivity : AppCompatActivity() {
             ))
     }
 }
+
+// ── Adapter ───────────────────────────────────────────────────────────────────
 
 class ChatAdapter(
     private val messages: List<ChatActivity.ChatMessage>,

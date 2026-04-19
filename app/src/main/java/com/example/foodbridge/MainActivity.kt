@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import android.widget.ImageButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,6 +21,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(R.layout.activity_main)
+        ExpiryCheckWorker.schedule(this)
         setupButtons()
         setupHowItWorks()
         setupBottomNav()
@@ -39,9 +41,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
 
-        // FAB cart → opens CartActivity (NOT TrackOrdersActivity)
+        // FAB cart → opens CartActivity
         findViewById<FloatingActionButton>(R.id.fabCart).setOnClickListener {
             startActivity(Intent(this, CartActivity::class.java))
+        }
+
+        // Chat button in hero section → opens ChatListActivity
+        findViewById<ImageButton>(R.id.btnChat).setOnClickListener {
+            startActivity(Intent(this, ChatListActivity::class.java))
         }
     }
 
@@ -77,6 +84,7 @@ class MainActivity : AppCompatActivity() {
                     R.id.nav_home    -> true
                     R.id.nav_donate  -> { startActivity(Intent(this, DonateFoodActivity::class.java)); true }
                     R.id.nav_browse  -> { startActivity(Intent(this, BrowseActivity::class.java)); true }
+                    R.id.nav_chat    -> { startActivity(Intent(this, ChatListActivity::class.java)); true }
                     R.id.nav_fssai   -> { startActivity(Intent(this, FssaiActivity::class.java)); true }
                     R.id.nav_profile -> { startActivity(Intent(this, ProfileActivity::class.java)); true }
                     else -> false

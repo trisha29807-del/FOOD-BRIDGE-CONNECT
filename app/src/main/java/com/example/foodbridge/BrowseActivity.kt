@@ -128,6 +128,7 @@ class BrowseActivity : AppCompatActivity() {
 
     // ── Chat ──────────────────────────────────────────────────────────────────
 
+    // Replace openChat() in BrowseActivity.kt with this:
     private fun openChat(doc: DocumentSnapshot) {
         val myUid     = FirebaseHelper.currentUid ?: return
         val donorUid  = doc.getString("donorUid")  ?: return
@@ -138,14 +139,22 @@ class BrowseActivity : AppCompatActivity() {
             return
         }
 
-        // Chat ID = sorted UIDs joined — same room regardless of who opens first
         val chatId = listOf(myUid, donorUid).sorted().joinToString("_")
+
+        // Pre-save donor name so ChatListActivity shows it
+        FirebaseFirestore.getInstance().collection("chats").document(chatId)
+            .set(mapOf(
+                "participants"              to listOf(myUid, donorUid),
+                "participantNames.$donorUid" to donorName,
+                "lastUpdated"               to com.google.firebase.Timestamp.now()
+            ), com.google.firebase.firestore.SetOptions.merge())
 
         startActivity(Intent(this, ChatActivity::class.java).apply {
             putExtra("chatId",    chatId)
             putExtra("otherName", donorName)
         })
     }
+
 
     // ── Firestore ─────────────────────────────────────────────────────────────
 

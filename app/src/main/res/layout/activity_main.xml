@@ -92,15 +92,38 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- Top bar: title on left, chat button on right -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="FoodBridge"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="top|center_horizontal"
-                    android:layout_marginTop="36dp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_gravity="top"
+                    android:layout_marginTop="36dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="FoodBridge"
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFFFFF" />
+
+                    <!-- Chat button — top right of hero -->
+                    <ImageButton
+                        android:id="@+id/btnChat"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:src="@android:drawable/ic_dialog_email"
+                        android:background="#55FFFFFF"
+                        android:padding="10dp"
+                        android:contentDescription="Open Chats"
+                        android:tint="#FFFFFF" />
+
+                </LinearLayout>
 
             </FrameLayout>
 
@@ -419,7 +442,6 @@
         app:itemTextColor="#2E7D32"
         app:menu="@menu/bottom_nav_menu" />
 
-    <!-- Add this AFTER the BottomNavigationView in activity_main.xml -->
     <!-- Floating cart button — bottom right corner -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabCart"

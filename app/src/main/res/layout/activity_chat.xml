@@ -4,16 +4,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F5EE">
+    android:background="#ECE5DD">
 
-    <!-- Top bar -->
+    <!-- WhatsApp-style top bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="60dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#2E7D32"
-        android:padding="8dp">
+        android:paddingStart="4dp"
+        android:paddingEnd="12dp">
 
         <ImageButton
             android:id="@+id/btnBack"
@@ -24,48 +25,78 @@
             android:tint="#FFFFFF"
             android:contentDescription="Back" />
 
+        <!-- Avatar circle -->
         <TextView
-            android:id="@+id/tvChatTitle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:text="👤"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:background="@drawable/circle_avatar_bg"
+            android:layout_marginStart="4dp" />
+
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Chat"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:layout_marginStart="8dp" />
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:id="@+id/tvChatTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Donor"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvOnlineStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FoodBridge Chat"
+                android:textSize="12sp"
+                android:textColor="#CCFFFFFF" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Messages -->
+    <!-- Messages list -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         android:clipToPadding="false" />
 
-    <!-- Input row -->
+    <!-- Input bar - WhatsApp style -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="#FFFFFF"
-        android:padding="8dp"
-        android:elevation="4dp">
+        android:background="#F0F0F0"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp">
 
         <EditText
             android:id="@+id/etMessage"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="Type a message..."
-            android:background="@drawable/spinner_bg"
+            android:hint="Message"
+            android:background="@drawable/chat_input_bg"
             android:padding="12dp"
-            android:textSize="14sp"
-            android:maxLines="3"
-            android:inputType="textMultiLine" />
+            android:textSize="15sp"
+            android:maxLines="4"
+            android:inputType="textMultiLine"
+            android:minHeight="44dp" />
 
         <ImageButton
             android:id="@+id/btnSend"

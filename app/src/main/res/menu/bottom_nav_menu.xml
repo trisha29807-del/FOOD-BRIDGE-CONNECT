@@ -13,6 +13,10 @@
         android:icon="@drawable/ic_browse"
         android:title="Browse" />
     <item
+        android:id="@+id/nav_chat"
+        android:icon="@drawable/ic_email"
+        android:title="Chat" />
+    <item
         android:id="@+id/nav_fssai"
         android:icon="@drawable/ic_fssai"
         android:title="FSSAI" />
