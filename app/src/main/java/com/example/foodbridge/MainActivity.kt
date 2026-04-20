@@ -7,7 +7,6 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import android.widget.ImageButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,13 +40,15 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, BrowseActivity::class.java))
         }
 
-        // FAB cart → opens CartActivity
+        // ── FAB: Cart ─────────────────────────────────────────────────────────
         findViewById<FloatingActionButton>(R.id.fabCart).setOnClickListener {
             startActivity(Intent(this, CartActivity::class.java))
         }
 
-        // Chat button in hero section → opens ChatListActivity
-        findViewById<ImageButton>(R.id.btnChat).setOnClickListener {
+        // ── FAB: Chat (placed on the main page, NOT in the bottom nav) ────────
+        // Make sure activity_main.xml has a second FAB with id="fabChat"
+        // positioned above fabCart (e.g. using a vertical chain or margin).
+        findViewById<FloatingActionButton>(R.id.fabChat).setOnClickListener {
             startActivity(Intent(this, ChatListActivity::class.java))
         }
     }
@@ -78,13 +79,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBottomNav() {
+        // ── Bottom nav has NO chat item — chat is now the fabChat FAB above ───
+        // Make sure your bottom_nav_menu.xml does NOT contain a nav_chat item.
+        // If it does, remove it from the XML.
         findViewById<BottomNavigationView>(R.id.bottomNav)
             .setOnItemSelectedListener { item ->
                 when (item.itemId) {
                     R.id.nav_home    -> true
                     R.id.nav_donate  -> { startActivity(Intent(this, DonateFoodActivity::class.java)); true }
                     R.id.nav_browse  -> { startActivity(Intent(this, BrowseActivity::class.java)); true }
-                    R.id.nav_chat    -> { startActivity(Intent(this, ChatListActivity::class.java)); true }
                     R.id.nav_fssai   -> { startActivity(Intent(this, FssaiActivity::class.java)); true }
                     R.id.nav_profile -> { startActivity(Intent(this, ProfileActivity::class.java)); true }
                     else -> false

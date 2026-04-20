@@ -16,7 +16,6 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Food image -->
         <ImageView
             android:id="@+id/ivFoodImage"
             android:layout_width="match_parent"
@@ -25,12 +24,11 @@
             android:visibility="gone"
             android:contentDescription="Food photo" />
 
-        <!-- Expiry warning banner -->
         <TextView
             android:id="@+id/tvExpiryWarn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚠️ Expiring soon! Claim now"
+            android:text="⚠️ Expiring soon!"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
@@ -45,7 +43,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Header row: name + veg + type -->
+            <!-- Header row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -81,11 +79,6 @@
                     android:id="@+id/tvDistance"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="📌 1.2 km"
-                    android:textSize="11sp"
-                    android:textColor="#F57C00"
-                    android:textStyle="bold"
-                    android:layout_marginEnd="6dp"
                     android:visibility="gone" />
 
                 <TextView
@@ -102,7 +95,7 @@
                     android:paddingBottom="3dp" />
             </LinearLayout>
 
-            <!-- Price + Listing type row -->
+            <!-- Price row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -133,7 +126,7 @@
                 android:id="@+id/tvDonorName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="👤 Priya Sharma"
+                android:text="👤 Priya"
                 android:textSize="13sp"
                 android:textColor="#555555"
                 android:layout_marginBottom="4dp" />
@@ -151,7 +144,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:layout_marginBottom="10dp">
 
                 <TextView
                     android:id="@+id/tvQuantity"
@@ -182,7 +175,7 @@
                 android:layout_marginBottom="10dp"
                 android:visibility="gone" />
 
-            <!-- Order / Claim -->
+            <!-- Buttons -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnClaim"
                 android:layout_width="match_parent"
@@ -195,7 +188,6 @@
                 app:cornerRadius="10dp"
                 android:stateListAnimator="@null" />
 
-            <!-- Add to Cart -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddToCart"
                 android:layout_width="match_parent"
@@ -211,7 +203,6 @@
                 app:cornerRadius="10dp"
                 android:stateListAnimator="@null" />
 
-            <!-- Chat with Donor -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnChat"
                 android:layout_width="match_parent"

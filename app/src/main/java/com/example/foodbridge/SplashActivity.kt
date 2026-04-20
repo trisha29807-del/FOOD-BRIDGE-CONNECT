@@ -12,12 +12,13 @@ class SplashActivity : AppCompatActivity() {
         setContentView(R.layout.activity_splash)
 
         Handler(Looper.getMainLooper()).postDelayed({
-            if (FirebaseHelper.isLoggedIn()) {
-                startActivity(Intent(this, MainActivity::class.java))
+            val intent = if (FirebaseHelper.isLoggedIn()) {
+                Intent(this, MainActivity::class.java)
             } else {
-                startActivity(Intent(this, LoginActivity::class.java))
+                Intent(this, LoginActivity::class.java)
             }
+            startActivity(intent)
             finish()
-        }, 2000)
+        }, 2500)
     }
 }

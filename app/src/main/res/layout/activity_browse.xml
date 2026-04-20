@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:layout_marginBottom="56dp">
 
-        <!-- Top Bar with Cart Icon -->
+        <!-- Top Bar with Cart -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -20,7 +20,7 @@
             android:gravity="center_vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:paddingTop="16dp"
+            android:paddingTop="14dp"
             android:paddingBottom="8dp">
 
             <TextView
@@ -32,7 +32,6 @@
                 android:textStyle="bold"
                 android:textColor="#222222" />
 
-            <!-- Cart Icon with Badge -->
             <FrameLayout
                 android:id="@+id/btnCart"
                 android:layout_width="44dp"
@@ -61,6 +60,45 @@
             </FrameLayout>
         </LinearLayout>
 
+        <!-- Donate + Request buttons row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="10dp"
+            android:weightSum="2">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDonateQuick"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="🍱  Donate Food"
+                android:textSize="13sp"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#2E7D32"
+                app:cornerRadius="10dp"
+                android:stateListAnimator="@null" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRequestFood"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="🙏  Request Food"
+                android:textSize="13sp"
+                android:textColor="#2E7D32"
+                app:backgroundTint="#E8F5E9"
+                app:strokeColor="#2E7D32"
+                app:strokeWidth="1dp"
+                app:cornerRadius="10dp"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
+
         <!-- Search Bar -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
@@ -80,8 +118,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Search food, location, donor..."
-                android:textSize="14sp"
-                android:textColor="#333333" />
+                android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Filter Chips -->
@@ -93,7 +130,7 @@
             android:paddingEnd="16dp"
             android:layout_marginBottom="8dp" />
 
-        <!-- SwipeRefreshLayout wraps RecyclerView + Empty state -->
+        <!-- SwipeRefreshLayout -->
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipeRefresh"
             android:layout_width="match_parent"
@@ -104,7 +141,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- RecyclerView -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerView"
                     android:layout_width="match_parent"
@@ -114,7 +150,6 @@
                     android:clipToPadding="false"
                     android:visibility="gone" />
 
-                <!-- Empty State -->
                 <LinearLayout
                     android:id="@+id/layoutEmpty"
                     android:layout_width="match_parent"
@@ -122,35 +157,21 @@
                     android:orientation="vertical"
                     android:gravity="center"
                     android:visibility="visible">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🍽️"
-                        android:textSize="56sp" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🍽️" android:textSize="56sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:text="No food listings available"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#555555"
-                        android:layout_marginTop="12dp" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
+                        android:textSize="16sp" android:textStyle="bold"
+                        android:textColor="#555555" android:layout_marginTop="12dp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:text="Pull down to refresh or adjust filters"
-                        android:textSize="13sp"
-                        android:textColor="#888888"
-                        android:layout_marginTop="4dp" />
+                        android:textSize="13sp" android:textColor="#888888" android:layout_marginTop="4dp" />
                 </LinearLayout>
-
             </FrameLayout>
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     </LinearLayout>
 
-    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"

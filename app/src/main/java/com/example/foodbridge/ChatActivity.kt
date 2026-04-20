@@ -13,9 +13,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.launch
 
 class ChatActivity : AppCompatActivity() {
@@ -47,11 +49,11 @@ class ChatActivity : AppCompatActivity() {
         chatId        = intent.getStringExtra("chatId")    ?: ""
         otherUserName = intent.getStringExtra("otherName") ?: "User"
 
-        recyclerView    = findViewById(R.id.recyclerView)
-        etMessage       = findViewById(R.id.etMessage)
-        btnSend         = findViewById(R.id.btnSend)
-        tvChatTitle     = findViewById(R.id.tvChatTitle)
-        tvOnlineStatus  = findViewById(R.id.tvOnlineStatus)
+        recyclerView   = findViewById(R.id.recyclerView)
+        etMessage      = findViewById(R.id.etMessage)
+        btnSend        = findViewById(R.id.btnSend)
+        tvChatTitle    = findViewById(R.id.tvChatTitle)
+        tvOnlineStatus = findViewById(R.id.tvOnlineStatus)
 
         tvChatTitle.text    = otherUserName
         tvOnlineStatus.text = "FoodBridge Chat"
@@ -71,75 +73,106 @@ class ChatActivity : AppCompatActivity() {
         adapter = ChatAdapter(messages, FirebaseHelper.currentUid ?: "")
         recyclerView.adapter = adapter
 
-        // Initialize chat document with participant info
-        initChatDocument()
+        // ── KEY FIX: init document first, THEN start listening ───────────────
+        initChatDocumentAndListen()
         setupSend()
     }
 
     override fun onStart() {
         super.onStart()
-        // Start real-time listener when activity is visible
-        startListening()
+        // Listener is started inside initChatDocumentAndListen() after doc is ready
+        // but if activity resumes after being stopped we re-attach
+        if (messageListener == null && chatId.isNotEmpty()) {
+            startListening()
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        // Remove listener when activity goes to background to save reads
         messageListener?.remove()
+        messageListener = null
     }
 
-    private fun initChatDocument() {
+    /**
+     * Ensures the chat document exists in Firestore with BOTH participant UIDs
+     * and BOTH participant names before we start listening for messages.
+     *
+     * Root cause of the "receiver can't receive" bug:
+     *   - The sender created the chat doc with only their own UID / name.
+     *   - The receiver opened the chat, but their UID was missing from
+     *     `participants`, so Firestore security rules blocked them from reading
+     *     the messages sub-collection.
+     *
+     * Fix: always merge BOTH UIDs and look up BOTH names.
+     */
+    private fun initChatDocumentAndListen() {
         val myUid = FirebaseHelper.currentUid ?: return
-        // Extract other UID from chatId (format: uid1_uid2)
-        val uids = chatId.split("_")
-        val otherUid = uids.firstOrNull { it != myUid } ?: return
 
-        // Save participant info so ChatListActivity can show names
-        db.collection("chats").document(chatId)
-            .get()
-            .addOnSuccessListener { doc ->
-                if (!doc.exists()) {
-                    // Create chat document with participants list
-                    db.collection("chats").document(chatId).set(mapOf(
-                        "participants"     to listOf(myUid, otherUid),
-                        "participantNames" to mapOf(myUid to "Me"),
-                        "lastMessage"      to "",
-                        "lastUpdated"      to Timestamp.now(),
-                        "createdAt"        to Timestamp.now()
-                    ))
-                }
-                // Update my name in the chat
-                lifecycleScope.launch {
-                    val result = FirebaseHelper.getUserProfile(myUid)
-                    val name = result.getOrNull()?.get("name") as? String ?: "User"
-                    db.collection("chats").document(chatId)
-                        .update("participantNames.$myUid", name)
+        // chatId is always "<smallerUid>_<largerUid>"
+        val uids = chatId.split("_")
+        if (uids.size != 2) { startListening(); return }
+
+        val otherUid = uids.firstOrNull { it != myUid } ?: run { startListening(); return }
+        val chatRef  = db.collection("chats").document(chatId)
+
+        // Step 1: ensure participants list has BOTH uids
+        chatRef.set(
+            mapOf(
+                "participants" to FieldValue.arrayUnion(myUid, otherUid),
+                "lastUpdated"  to Timestamp.now()
+            ),
+            SetOptions.merge()
+        ).addOnCompleteListener {
+            // Step 2: write MY display name into participantNames map
+            lifecycleScope.launch {
+                val result = FirebaseHelper.getUserProfile(myUid)
+                val myName = result.getOrNull()?.get("name") as? String ?: "User"
+
+                chatRef.set(
+                    mapOf(
+                        "participantNames" to mapOf(myUid to myName)
+                    ),
+                    SetOptions.merge()
+                ).addOnCompleteListener {
+                    // Step 3: ONLY start listening once the doc is properly set up
+                    startListening()
                 }
             }
+        }
     }
 
     private fun startListening() {
         if (chatId.isEmpty()) return
+        if (messageListener != null) return   // already listening
 
         messageListener = db.collection("chats").document(chatId)
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
+                if (error != null) {
+                    // Surface the real error so you can see Firestore rule denials in logcat
+                    Toast.makeText(
+                        this,
+                        "Chat error: ${error.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@addSnapshotListener
+                }
                 snapshot ?: return@addSnapshotListener
 
                 val uid = FirebaseHelper.currentUid ?: ""
                 messages.clear()
                 snapshot.documents.forEach { doc ->
-                    messages.add(ChatMessage(
-                        text      = doc.getString("text")      ?: "",
-                        senderUid = doc.getString("senderUid") ?: "",
-                        timestamp = doc.getTimestamp("timestamp") ?: Timestamp.now(),
-                        isMe      = doc.getString("senderUid") == uid
-                    ))
+                    messages.add(
+                        ChatMessage(
+                            text      = doc.getString("text")      ?: "",
+                            senderUid = doc.getString("senderUid") ?: "",
+                            timestamp = doc.getTimestamp("timestamp") ?: Timestamp.now(),
+                            isMe      = doc.getString("senderUid") == uid
+                        )
+                    )
                 }
                 adapter.notifyDataSetChanged()
-                // Auto scroll to latest message
                 if (messages.isNotEmpty()) {
                     recyclerView.post {
                         recyclerView.scrollToPosition(messages.size - 1)
@@ -150,6 +183,9 @@ class ChatActivity : AppCompatActivity() {
 
     private fun setupSend() {
         btnSend.setOnClickListener { sendMessage() }
+        etMessage.setOnEditorActionListener { _, _, _ ->
+            sendMessage(); true
+        }
     }
 
     private fun sendMessage() {
@@ -163,27 +199,29 @@ class ChatActivity : AppCompatActivity() {
 
         etMessage.setText("")
 
-        val message = mapOf(
+        val message = hashMapOf(
             "text"      to text,
             "senderUid" to uid,
             "timestamp" to Timestamp.now()
         )
 
-        // Add message to subcollection
         db.collection("chats").document(chatId)
             .collection("messages")
             .add(message)
             .addOnFailureListener {
-                Toast.makeText(this, "Failed to send message", Toast.LENGTH_SHORT).show()
-                etMessage.setText(text) // restore text on failure
+                Toast.makeText(this, "Failed to send", Toast.LENGTH_SHORT).show()
+                etMessage.setText(text)
             }
 
-        // Update last message on chat document for ChatListActivity
+        // Update last-message preview for ChatListActivity
         db.collection("chats").document(chatId)
-            .update(mapOf(
-                "lastMessage" to text,
-                "lastUpdated" to Timestamp.now()
-            ))
+            .set(
+                mapOf(
+                    "lastMessage" to text,
+                    "lastUpdated" to Timestamp.now()
+                ),
+                SetOptions.merge()
+            )
     }
 }
 

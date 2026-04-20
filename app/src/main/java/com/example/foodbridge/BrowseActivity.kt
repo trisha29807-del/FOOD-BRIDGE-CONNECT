@@ -25,7 +25,7 @@ import com.google.android.material.chip.ChipGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -43,8 +43,11 @@ class BrowseActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
 
     private val db = FirebaseFirestore.getInstance()
-    private var allListings = mutableListOf<DocumentSnapshot>()
+    private var allItems = mutableListOf<DocumentSnapshot>()
     private var selectedFilter = "All"
+
+    // Updated filter list: includes Donate and Request
+    private val filterLabels = listOf("All", "Veg", "Non-Veg", "Cooked", "Packed", "Fruits/Veg", "Donations", "Requests")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,30 +67,36 @@ class BrowseActivity : AppCompatActivity() {
             onAddCart = { doc -> addToCart(doc) },
             onChat    = { doc -> openChat(doc) }
         )
+
+        findViewById<MaterialButton>(R.id.btnDonateQuick).setOnClickListener {
+            startActivity(Intent(this, DonateFoodActivity::class.java))
+        }
+
+        findViewById<MaterialButton>(R.id.btnRequestFood).setOnClickListener {
+            startActivity(Intent(this, RequestFoodActivity::class.java))
+        }
+
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        // Cart icon → CartActivity
         btnCart.setOnClickListener {
             startActivity(Intent(this, CartActivity::class.java))
         }
 
         swipeRefresh.setColorSchemeColors(getColor(R.color.green_primary))
-        swipeRefresh.setOnRefreshListener { loadListings() }
+        swipeRefresh.setOnRefreshListener { loadData() }
 
         setupChips()
         setupSearch()
         setupBottomNav()
-        loadListings()
+        loadData()
     }
 
     override fun onResume() {
         super.onResume()
-        loadListings()
+        loadData()
         updateCartBadge()
     }
-
-    // ── Cart ──────────────────────────────────────────────────────────────────
 
     private fun updateCartBadge() {
         val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
@@ -97,6 +106,10 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun addToCart(doc: DocumentSnapshot) {
+        if (doc.reference.path.contains("food_requests")) {
+            Toast.makeText(this, "Cannot add a request to cart", Toast.LENGTH_SHORT).show()
+            return
+        }
         val prefs = getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
         val arr   = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
         for (i in 0 until arr.length()) {
@@ -105,11 +118,16 @@ class BrowseActivity : AppCompatActivity() {
                 return
             }
         }
+
+        val rawQty = doc.getString("quantity") ?: "1"
+        val maxQty = rawQty.filter { it.isDigit() }.toIntOrNull() ?: 1
+
         val obj = JSONObject().apply {
             put("id",          doc.id)
             put("name",        doc.getString("foodName")  ?: "")
             put("type",        doc.getString("foodType")  ?: "")
-            put("quantity",    doc.getString("quantity")  ?: "")
+            put("quantity",    rawQty)
+            put("maxQty",      maxQty)
             put("location",    doc.getString("location")  ?: "")
             put("donor",       doc.getString("donorName") ?: "Anonymous")
             put("donorUid",    doc.getString("donorUid")  ?: "")
@@ -126,92 +144,121 @@ class BrowseActivity : AppCompatActivity() {
         updateCartBadge()
     }
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
-
-    // Replace openChat() in BrowseActivity.kt with this:
     private fun openChat(doc: DocumentSnapshot) {
         val myUid     = FirebaseHelper.currentUid ?: return
-        val donorUid  = doc.getString("donorUid")  ?: return
-        val donorName = doc.getString("donorName") ?: "Donor"
+        val isRequest = doc.reference.path.contains("food_requests")
 
-        if (myUid == donorUid) {
-            Toast.makeText(this, "You cannot chat with yourself", Toast.LENGTH_SHORT).show()
+        val otherUid  = if (isRequest) doc.getString("requesterUid") else doc.getString("donorUid")
+        val otherName = if (isRequest) doc.getString("requesterName") else doc.getString("donorName") ?: "User"
+
+        if (myUid == otherUid || otherUid == null) {
+            Toast.makeText(this, "Cannot chat with yourself", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val chatId = listOf(myUid, donorUid).sorted().joinToString("_")
+        val chatId = listOf(myUid, otherUid).sorted().joinToString("_")
 
-        // Pre-save donor name so ChatListActivity shows it
         FirebaseFirestore.getInstance().collection("chats").document(chatId)
-            .set(mapOf(
-                "participants"              to listOf(myUid, donorUid),
-                "participantNames.$donorUid" to donorName,
-                "lastUpdated"               to com.google.firebase.Timestamp.now()
-            ), com.google.firebase.firestore.SetOptions.merge())
+            .set(
+                mapOf(
+                    "participants"     to listOf(myUid, otherUid),
+                    "participantNames" to mapOf(otherUid to otherName),
+                    "lastUpdated"      to com.google.firebase.Timestamp.now()
+                ),
+                SetOptions.merge()
+            )
 
         startActivity(Intent(this, ChatActivity::class.java).apply {
             putExtra("chatId",    chatId)
-            putExtra("otherName", donorName)
+            putExtra("otherName", otherName)
         })
     }
-
-
-    // ── Firestore ─────────────────────────────────────────────────────────────
 
     private fun openPlaceOrder(doc: DocumentSnapshot) {
-        startActivity(Intent(this, PlaceOrderActivity::class.java).apply {
-            putExtra("listingId", doc.id)
-            putExtra("foodName",  doc.getString("foodName")  ?: "")
-            putExtra("donorUid",  doc.getString("donorUid")  ?: "")
-            putExtra("donorName", doc.getString("donorName") ?: "")
-            putExtra("quantity",  doc.getString("quantity")  ?: "")
-            putExtra("location",  doc.getString("location")  ?: "")
-            putExtra("foodType",  doc.getString("foodType")  ?: "")
-        })
+        val isRequest = doc.reference.path.contains("food_requests")
+        if (isRequest) {
+            // Redirect to FulfillRequestActivity instead of DonateFoodActivity directly
+            startActivity(Intent(this, FulfillRequestActivity::class.java).apply {
+                putExtra("requestId",       doc.id)
+                putExtra("requesterName",   doc.getString("requesterName") ?: "Anonymous")
+                putExtra("requesterUid",    doc.getString("requesterUid")  ?: "")
+                putExtra("foodName",        doc.getString("foodName")      ?: "")
+                putExtra("quantity",        doc.getString("quantity")      ?: "")
+                putExtra("location",        doc.getString("location")      ?: "")
+                putExtra("reason",          doc.getString("reason")        ?: "")
+                putExtra("urgency",         doc.getString("urgency")       ?: "Normal")
+            })
+        } else {
+            val rawQty = doc.getString("quantity") ?: "1"
+            val maxQty = rawQty.filter { it.isDigit() }.toIntOrNull() ?: 1
+            startActivity(Intent(this, PlaceOrderActivity::class.java).apply {
+                putExtra("listingId", doc.id)
+                putExtra("foodName",  doc.getString("foodName")  ?: "")
+                putExtra("donorUid",  doc.getString("donorUid")  ?: "")
+                putExtra("donorName", doc.getString("donorName") ?: "")
+                putExtra("quantity",  rawQty)
+                putExtra("maxQty",    maxQty)
+                putExtra("location",  doc.getString("location")  ?: "")
+                putExtra("foodType",  doc.getString("foodType")  ?: "")
+            })
+        }
     }
 
-    private fun loadListings() {
-        db.collection("food_listings")
-            .whereEqualTo("status", "available")
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                swipeRefresh.isRefreshing = false
-                val now = com.google.firebase.Timestamp.now()
-                allListings = snapshot.documents.filter { doc ->
-                    val expiry = doc.getTimestamp("expiryDate")
-                    expiry == null || expiry.compareTo(now) > 0
-                }.toMutableList()
-                applyFilters()
+    private fun loadData() {
+        swipeRefresh.isRefreshing = true
+        db.collection("food_listings").whereEqualTo("status", "available").get()
+            .addOnSuccessListener { listings ->
+                db.collection("food_requests").whereEqualTo("status", "open").get()
+                    .addOnSuccessListener { requests ->
+                        swipeRefresh.isRefreshing = false
+                        val now = com.google.firebase.Timestamp.now()
+
+                        val combined = mutableListOf<DocumentSnapshot>()
+                        combined.addAll(listings.documents)
+                        combined.addAll(requests.documents)
+
+                        allItems = combined.filter { doc ->
+                            val expiry = doc.getTimestamp("expiryDate")
+                            expiry == null || expiry.compareTo(now) > 0
+                        }.sortedByDescending {
+                            it.getTimestamp("createdAt") ?: it.getTimestamp("expiryDate")
+                        }.toMutableList()
+
+                        applyFilters()
+                    }
             }
-            .addOnFailureListener { e ->
+            .addOnFailureListener {
                 swipeRefresh.isRefreshing = false
-                Toast.makeText(this, "Failed to load: ${e.message}", Toast.LENGTH_LONG).show()
                 showEmpty(true)
             }
     }
 
     private fun applyFilters() {
         val query = etSearch.text?.toString()?.trim()?.lowercase().orEmpty()
-        val filtered = allListings.filter { doc ->
-            val type  = doc.getString("foodType") ?: ""
-            val isVeg = doc.getBoolean("isVeg")
+        val filtered = allItems.filter { doc ->
+            val isRequest = doc.reference.path.contains("food_requests")
+            val foodType  = doc.getString("foodType")?.lowercase() ?: ""
+            val isVeg     = doc.getBoolean("isVeg")
+
             val matchesFilter = when (selectedFilter) {
                 "All"        -> true
+                "Requests"   -> isRequest
+                "Donations"  -> !isRequest
                 "Veg"        -> isVeg == true
                 "Non-Veg"    -> isVeg == false
-                "Cooked"     -> type.contains("Cooked",    ignoreCase = true)
-                "Fruits/Veg" -> type.contains("Fruit",     ignoreCase = true) || type.contains("Vegetable", ignoreCase = true) || type.contains("Raw", ignoreCase = true)
-                "Packed"     -> type.contains("Bakery",    ignoreCase = true) || type.contains("Grain",     ignoreCase = true) || type.contains("Beverage", ignoreCase = true) || type.contains("Dairy", ignoreCase = true)
+                "Cooked"     -> foodType.contains("cooked")
+                "Packed"     -> foodType.contains("packed")
+                "Fruits/Veg" -> foodType.contains("fruit") || foodType.contains("vegetable") || foodType.contains("veg")
                 else         -> true
             }
-            val matchesSearch = query.isEmpty() ||
-                    (doc.getString("foodName") ?.lowercase()?.contains(query) == true) ||
-                    (doc.getString("location") ?.lowercase()?.contains(query) == true) ||
-                    (doc.getString("foodType") ?.lowercase()?.contains(query) == true) ||
-                    (doc.getString("donorName")?.lowercase()?.contains(query) == true)
+
+            val name = doc.getString("foodName")?.lowercase() ?: ""
+            val loc  = doc.getString("location")?.lowercase() ?: ""
+            val matchesSearch = query.isEmpty() || name.contains(query) || loc.contains(query)
+
             matchesFilter && matchesSearch
         }.toMutableList()
+
         adapter.updateItems(filtered)
         showEmpty(filtered.isEmpty())
     }
@@ -222,17 +269,18 @@ class BrowseActivity : AppCompatActivity() {
     }
 
     private fun setupChips() {
-        listOf("All", "Veg", "Non-Veg", "Cooked", "Packed", "Fruits/Veg").forEach { label ->
+        chipGroup.removeAllViews()
+        filterLabels.forEach { label ->
             val chip = Chip(this)
-            chip.text = label; chip.isCheckable = true; chip.isChecked = label == "All"
-            chip.chipBackgroundColor = null
+            chip.text = label
+            chip.isCheckable = true
+            chip.isChecked = (label == "All")
             chip.setTextColor(getColor(R.color.green_primary))
-            chip.chipStrokeWidth = 2f
-            chip.setChipStrokeColorResource(R.color.green_primary)
             chip.setOnClickListener {
                 selectedFilter = label
                 for (i in 0 until chipGroup.childCount) (chipGroup.getChildAt(i) as Chip).isChecked = false
-                chip.isChecked = true; applyFilters()
+                chip.isChecked = true
+                applyFilters()
             }
             chipGroup.addView(chip)
         }
@@ -287,7 +335,6 @@ class BrowseAdapter(
         val tvQuantity:    TextView       = view.findViewById(R.id.tvQuantity)
         val tvExpiry:      TextView       = view.findViewById(R.id.tvExpiry)
         val tvDescription: TextView       = view.findViewById(R.id.tvDescription)
-        val tvDistance:    TextView       = view.findViewById(R.id.tvDistance)
         val tvVegBadge:    TextView       = view.findViewById(R.id.tvVegBadge)
         val btnClaim:      MaterialButton = view.findViewById(R.id.btnClaim)
         val btnAddToCart:  MaterialButton = view.findViewById(R.id.btnAddToCart)
@@ -300,83 +347,57 @@ class BrowseAdapter(
     override fun getItemCount() = items.size
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val doc   = items[position]
-        val type  = doc.getString("foodType") ?: ""
-        val isVeg = doc.getBoolean("isVeg")
+        val doc = items[position]
+        val ctx = holder.itemView.context
+        val isRequest = doc.reference.path.contains("food_requests")
 
-        holder.tvFoodName.text  = doc.getString("foodName")  ?: "Unknown"
-        holder.tvFoodType.text  = type
-        holder.tvDonorName.text = doc.getString("donorName") ?: "Anonymous"
-        holder.tvLocation.text  = doc.getString("location")  ?: "Location not set"
-        holder.tvQuantity.text  = doc.getString("quantity")  ?: ""
-        holder.tvDistance.visibility = View.GONE
+        holder.tvFoodName.text = doc.getString("foodName") ?: "Unknown"
+        holder.tvLocation.text = doc.getString("location") ?: "No Location"
 
-        // Image
-        val imageUrl = doc.getString("imageUrl") ?: ""
-        if (imageUrl.isNotEmpty()) {
-            holder.ivFoodImage.visibility = View.VISIBLE
-            Glide.with(holder.itemView.context).load(imageUrl).centerCrop()
-                .placeholder(android.R.drawable.ic_menu_gallery).into(holder.ivFoodImage)
+        // ── Quantity: display only, NO adder controls ──────────────────────
+        holder.tvQuantity.text = doc.getString("quantity") ?: ""
+
+        if (isRequest) {
+            holder.tvDonorName.text   = "Requester: ${doc.getString("requesterName") ?: "Anonymous"}"
+            holder.tvFoodType.text    = "Urgency: ${doc.getString("urgency") ?: "Normal"}"
+            holder.tvListingType.text = "HELP NEEDED"
+            holder.tvPrice.text       = "Request"
+            holder.btnClaim.text      = "Fulfill Request"
+            holder.btnAddToCart.visibility = View.GONE
+            holder.ivFoodImage.visibility  = View.GONE
+            holder.tvExpiry.text      = "Reason: ${doc.getString("reason") ?: "N/A"}"
+            holder.tvVegBadge.visibility   = View.GONE
         } else {
-            holder.ivFoodImage.visibility = View.GONE
-        }
+            holder.tvDonorName.text   = "Donor: ${doc.getString("donorName") ?: "Anonymous"}"
+            holder.tvFoodType.text    = doc.getString("foodType") ?: ""
+            holder.tvListingType.text = doc.getString("listingType") ?: "Free Donation"
+            holder.btnClaim.text      = "Order / Claim"
+            holder.btnAddToCart.visibility = View.VISIBLE
 
-        // Veg badge
-        when (isVeg) {
-            true  -> { holder.tvVegBadge.text = "🟢 Veg";     holder.tvVegBadge.setBackgroundColor(0xFF2E7D32.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
-            false -> { holder.tvVegBadge.text = "🔴 Non-Veg"; holder.tvVegBadge.setBackgroundColor(0xFFC62828.toInt()); holder.tvVegBadge.visibility = View.VISIBLE }
-            null  -> holder.tvVegBadge.visibility = View.GONE
-        }
+            val price = doc.getDouble("price") ?: 0.0
+            holder.tvPrice.text = if (price == 0.0) "🆓 Free" else "₹${String.format("%.0f", price)}"
 
-        // Expiry + warning
-        val expiry = doc.getTimestamp("expiryDate")
-        if (expiry != null) {
-            val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
-            holder.tvExpiry.text = "⏰ ${sdf.format(expiry.toDate())}"
-            val timeLeft = expiry.toDate().time - System.currentTimeMillis()
-            holder.tvExpiryWarn.visibility = if (timeLeft in 0..(2 * 60 * 60 * 1000L)) View.VISIBLE else View.GONE
-        } else {
-            holder.tvExpiry.text = "N/A"
-            holder.tvExpiryWarn.visibility = View.GONE
-        }
-
-        // Description
-        val desc = doc.getString("description")
-        if (!desc.isNullOrEmpty()) { holder.tvDescription.text = desc; holder.tvDescription.visibility = View.VISIBLE }
-        else holder.tvDescription.visibility = View.GONE
-
-        // Price
-        val price = doc.getDouble("price") ?: 0.0
-        val listingType = doc.getString("listingType") ?: "Free Donation"
-        holder.tvPrice.text = if (price == 0.0) "🆓 Free" else "₹${String.format("%.0f", price)}"
-        holder.tvListingType.text = listingType
-
-        // Order button
-        holder.btnClaim.text = "Order / Claim"
-        holder.btnClaim.setOnClickListener { onOrder(doc) }
-
-        // Cart button
-        val prefs   = holder.itemView.context.getSharedPreferences("foodbridge_prefs", MODE_PRIVATE)
-        val cartArr = JSONArray(prefs.getString("cart_items", "[]") ?: "[]")
-        val inCart  = (0 until cartArr.length()).any { cartArr.getJSONObject(it).getString("id") == doc.id }
-        if (inCart) {
-            holder.btnAddToCart.text = "🛒 In Cart — View"
-            holder.btnAddToCart.setOnClickListener {
-                holder.itemView.context.startActivity(Intent(holder.itemView.context, CartActivity::class.java))
+            val imageUrl = doc.getString("imageUrl") ?: ""
+            if (imageUrl.isNotEmpty()) {
+                holder.ivFoodImage.visibility = View.VISIBLE
+                Glide.with(ctx).load(imageUrl).centerCrop().into(holder.ivFoodImage)
+            } else {
+                holder.ivFoodImage.visibility = View.GONE
             }
-        } else {
-            holder.btnAddToCart.text = "🛒  Add to Cart"
-            holder.btnAddToCart.setOnClickListener { onAddCart(doc) }
+
+            val expiry = doc.getTimestamp("expiryDate")
+            holder.tvExpiry.text = if (expiry != null)
+                "⏰ " + SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(expiry.toDate())
+            else "N/A"
         }
 
-        // Chat button — hide if this is the donor's own listing
+        // Chat visibility
         val myUid    = FirebaseHelper.currentUid ?: ""
-        val donorUid = doc.getString("donorUid") ?: ""
-        if (myUid == donorUid) {
-            holder.btnChat.visibility = View.GONE
-        } else {
-            holder.btnChat.visibility = View.VISIBLE
-            holder.btnChat.setOnClickListener { onChat(doc) }
-        }
+        val otherUid = if (isRequest) doc.getString("requesterUid") else doc.getString("donorUid")
+        holder.btnChat.visibility = if (myUid == otherUid) View.GONE else View.VISIBLE
+
+        holder.btnChat.setOnClickListener    { onChat(doc) }
+        holder.btnClaim.setOnClickListener   { onOrder(doc) }
+        holder.btnAddToCart.setOnClickListener { onAddCart(doc) }
     }
 }
